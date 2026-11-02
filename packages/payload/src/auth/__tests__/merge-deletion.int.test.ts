@@ -3,8 +3,8 @@
 // to an empty, disposable database; the schema is pushed on init.
 import type { Payload } from 'payload';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { deriveMonInstanceId } from '../../collections/core.ts';
-import { deleteCallerAccount, SANCTUARY_CALLER_ID } from '../deletion.ts';
+import { deriveMonGender, deriveMonInstanceId, deriveVoiceLineageId } from '../../collections/core.ts';
+import { deleteCallerAccount, releaseOwnAccount, SANCTUARY_CALLER_ID } from '../deletion.ts';
 import { transferAccount } from '../plugins/account-merge.ts';
 
 const url = process.env.X1_DATABASE_URL;
@@ -45,7 +45,11 @@ describe.skipIf(url === undefined)('merge and deletion on Postgres', () => {
     });
     await payload.create({
       collection: 'mon-instances',
-      data: { monInstanceId, eggId, speciesId: 'dex-002', nickname: 'Pip', callerId, hatchedAt, bond: 0, stage: 'Baby' },
+      data: {
+        monInstanceId, eggId, speciesId: 'dex-002', nickname: 'Pip', callerId, hatchedAt, bond: 0, stage: 'Baby',
+        // The create hook requires the egg-derived gender and voice lineage (Bible v11 ¶54, ¶56).
+        gender: deriveMonGender(eggId, 'dex-001'), voiceLineageId: deriveVoiceLineageId({ eggId, speciesId: 'dex-001' }),
+      },
       overrideAccess: true,
     });
     return { eggId, monInstanceId };
@@ -120,6 +124,21 @@ describe.skipIf(url === undefined)('merge and deletion on Postgres', () => {
     const [egg] = (await payload.find({ collection: 'eggs', where: { eggId: { equals: eggId } }, overrideAccess: true })).docs;
     expect(egg?.callerId).toBe(SANCTUARY_CALLER_ID);
     expect((await payload.find({ collection: 'users', where: { id: { equals: leaving } }, overrideAccess: true })).totalDocs).toBe(0);
+  });
+
+  it('self-service deletion releases Mons and eggs with no grace, and leaves the user row to Better Auth (M20)', async () => {
+    const leaving = await caller('self');
+    const { eggId, monInstanceId } = await hatchFor(leaving, 'x');
+
+    const result = await releaseOwnAccount(payload, leaving);
+
+    expect(result.releasedMonInstanceIds).toEqual([monInstanceId]);
+    expect(result.releasedEggIds).toEqual([eggId]);
+    expect(await monsOf(leaving)).toEqual([]);
+    // Better Auth's /delete-user removes the row after beforeDelete returns.
+    expect((await payload.find({ collection: 'users', where: { id: { equals: leaving } }, overrideAccess: true })).totalDocs).toBe(1);
+    // A second pass (a retried request) finds nothing left to move.
+    expect((await releaseOwnAccount(payload, leaving)).releasedMonInstanceIds).toEqual([]);
   });
 
   it('refuses a deletion that is not yet due', async () => {

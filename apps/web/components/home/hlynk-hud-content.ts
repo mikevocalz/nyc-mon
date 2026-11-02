@@ -1,7 +1,7 @@
 import { starterBloodlines } from '@acme/content';
 import { DISTRICT_COPY, DISTRICTS } from '@acme/spatial/copy';
 import { W01_COPY } from './copy.ts';
-import type { HudContent, HudMeter } from './hlynk-hud.ts';
+import type { HudContent, HudMeter } from '@acme/ui/three/hlynk/hud';
 
 /** Care meter colour on the screen, by the CARE section's tone for the same meter. */
 const METER_TONE: Record<(typeof W01_COPY.care.items)[number]['color'], HudMeter['tone']> = {
@@ -14,7 +14,7 @@ const METER_ORDER = ['Energy', 'Fullness', 'Social'] as const;
 
 /**
  * What the H-Lynk's screen shows (PS-037), all from approved sources: the
- * tier name and "Your Mon" (copy.ts), the three starters' Baby names and Dex
+ * tier name and "Your Mon" (copy.ts), the four starters' Baby names and Dex
  * numbers (@acme/content, Baby forms only), the CARE section's example meter
  * levels with its "example" line, and the four district names. Nothing is
  * invented for the screen.

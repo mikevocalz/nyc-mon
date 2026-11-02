@@ -1,6 +1,6 @@
 import { useImperativeHandle, useRef, type Ref } from 'react';
 import { Canvas, type CanvasRef, type RNCanvasContext } from 'react-native-webgpu';
-import type { ThreeSurfaceHandle } from './types';
+import type { AndroidSurfaceType, ThreeSurfaceHandle } from './types';
 import type { NativeCanvasContext } from './worklet-host';
 
 /**
@@ -9,13 +9,13 @@ import type { NativeCanvasContext } from './worklet-host';
  * stubs), which is all WebGPURenderer needs. Frames are presented explicitly
  * after each render. There is no WebGL2 backend on native.
  */
-export function ThreeSurface({ ref }: { ref?: Ref<ThreeSurfaceHandle> }) {
+export function ThreeSurface({ ref, androidSurfaceType }: { ref?: Ref<ThreeSurfaceHandle>; androidSurfaceType?: AndroidSurfaceType }) {
   const canvasRef = useRef<CanvasRef>(null);
   const contextRef = useRef<RNCanvasContext | null>(null);
   useImperativeHandle(ref, () => ({
-    createRenderer: (THREE, { device }) => {
+    createRenderer: (THREE, { device, rendererParams }) => {
       const context = canvasRef.current?.getContext('webgpu');
-      if (!context) throw new Error('[ThreeCanvas] react-native-webgpu context is not ready');
+      if (!context?.canvas) throw new Error('[ThreeCanvas] react-native-webgpu context is not ready');
       contextRef.current = context;
       return new THREE.WebGPURenderer({
         antialias: true,
@@ -23,9 +23,14 @@ export function ThreeSurface({ ref }: { ref?: Ref<ThreeSurfaceHandle> }) {
         canvas: context.canvas as unknown as HTMLCanvasElement,
         context,
         ...(device ? { device } : {}),
+        ...rendererParams,
       });
     },
     present: () => contextRef.current?.present(),
+    isReady: () => {
+      const canvas = canvasRef.current?.getContext('webgpu')?.canvas as { width?: number; height?: number } | undefined;
+      return typeof canvas?.width === 'number' && canvas.width > 0 && typeof canvas.height === 'number' && canvas.height > 0;
+    },
     // Worklet render mode: the context goes to the render runtime, which builds the renderer and presents.
     getContext: () => {
       const context = canvasRef.current?.getContext('webgpu') ?? null;
@@ -33,7 +38,10 @@ export function ThreeSurface({ ref }: { ref?: Ref<ThreeSurfaceHandle> }) {
       return context as unknown as NativeCanvasContext | null;
     },
   }));
-  // Transparent over the views behind it (TextureView on Android), so the
-  // parent's opacity applies. GPU surface: the Canvas takes a style, not a className.
-  return <Canvas ref={canvasRef} opaque={false} style={{ flex: 1 }} />;
+  // Transparent over the views behind it (TextureView on Android by default),
+  // so the parent's opacity applies. `androidSurfaceType` can instead pick the
+  // AHB-pool HardwareBufferView (mailbox present — never stalls the producer
+  // on the window queue) or a SurfaceView; see AndroidSurfaceType. GPU surface:
+  // the Canvas takes a style, not a className.
+  return <Canvas ref={canvasRef} android={{ backingView: androidSurfaceType, opaque: false }} style={{ flex: 1 }} />;
 }

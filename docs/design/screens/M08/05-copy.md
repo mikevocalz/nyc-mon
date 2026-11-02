@@ -15,19 +15,19 @@ Inside the SE H-Lynk screen (351 pt wide, 16 pt inner gutters, 319 pt text width
 | ID | String | Voice | Max | Notes | Canon |
 |---|---|---|---|---|---|
 | `m08.title` | Choose an egg | ui | 24 | `Heading level={1}` | Decision #5 |
-| `m08.santoro.caption` | Dr. Alessandra Santoro brought three eggs. | ui | 70 | Two lines on SE. Narration in the UI voice, not her speech | Decision #5; name per `V11 ¶83` |
+| `m08.santoro.caption` | Dr. Alessandra Santoro brought four eggs. | ui | 70 | Two lines on SE. Narration in the UI voice, not her speech | Decision #5; name per `V11 ¶83` |
 | `m08.santoro.line` | `TODO(canon)` | character | — | Ships empty and renders nothing until the Voice Bible gives Santoro a line | `V11 ¶83`, `¶84`; COPY_DECK open question 8 |
 | `m08.tile.label` | {eggName} | ui | 11 | Under each tile | Decision #9 |
-| `m08.tile.a11y.label` | {eggName}, {bloodline}, {index} of 3 | ui | — | Tile as a radio | Decisions #9, #11 |
+| `m08.tile.a11y.label` | {eggName}, {bloodline}, {index} of 4 | ui | — | Tile as a radio | Decisions #9, #11 |
 | `m08.tile.a11y.hint` | Opens a closer look | ui | — | | — |
-| `m08.trackpad.label.browsing` | Eggs, 3 | ui | — | Trackpad name before any focus | DIRECTION.md "Controls" |
-| `m08.trackpad.label.focused` | {eggName}, {index} of 3 | ui | — | The DIRECTION.md example | — |
+| `m08.trackpad.label.browsing` | Eggs, 4 | ui | — | Trackpad name before any focus | DIRECTION.md "Controls" |
+| `m08.trackpad.label.focused` | {eggName}, {index} of 4 | ui | — | The DIRECTION.md example | — |
 | `m08.trackpad.hint` | Flick to move between eggs. Hold to choose. | ui | — | Spoken after the name | — |
 | `m08.trackpad.commit.label` | Choose the {eggName} | ui | — | `commitLabel` | — |
 | `m08.action.look` | Look closer | ui | 30 | `TrackpadActions` `activateLabel` in browsing | — |
 | `m08.action.prev` | Previous egg | ui | 14 | `stepBackLabel` | — |
 | `m08.action.next` | Next egg | ui | 14 | `stepForwardLabel` | — |
-| `m08.action.all` | All three | ui | 14 | `activateLabel` while focused: back to browsing | — |
+| `m08.action.all` | All four | ui | 14 | `activateLabel` while focused: back to browsing | — |
 | `m08.card.number` | #{dexNumber} | ui | 4 | `#001`, `#008`, `#061`: the egg's own record (`06-critique.md` C4) | Decision #9 |
 | `m08.card.number.a11y` | Number {dexId} | ui | — | Read as a number, not "hash zero zero one" | — |
 | `m08.card.bloodline` | {bloodline} | ui | 34 | "Bodega Baddiee Cee Bloodline" is 28 | Decision #11 (UI label; never "Bodega Cee" here, #13) |

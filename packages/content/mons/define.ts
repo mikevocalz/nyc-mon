@@ -1,4 +1,8 @@
 import type { Bloodline, BloodlineId, EvolutionNode, LifecycleStage, MonSpeciesDef } from '@acme/core';
+import type { InheritedDexDetail } from './inherited-v11-starters.ts';
+
+/** Inherited v8 records keyed by Dex number; callers pass the smallest table that covers their forms. */
+export type InheritedDexTable = Readonly<Partial<Record<number, InheritedDexDetail>>>;
 
 /** A bloodline's identity without its chain: the roster's family number and name. */
 export interface BloodlineRef {
@@ -22,7 +26,9 @@ export function rosterForm(
   dexId: number,
   formName: string,
   stage: LifecycleStage,
+  details: InheritedDexTable,
 ): MonSpeciesDef {
+  const inherited = details[dexId];
   return {
     speciesId: speciesIdForDex(dexId),
     dexId,
@@ -44,6 +50,15 @@ export function rosterForm(
     affinityId: null,
     // TODO(canon): combat Class list not authored.
     classId: null,
+    // Inherited v8 type labels: reference only, not modern Affinity assignments.
+    legacyTypeNames: inherited ? [...inherited.legacyTypeNames] : null,
+    // Art-direction size text may include a range; do not synthesize scaleMeters.
+    scaleTargetDescription: inherited?.scaleTargetDescription ?? null,
+    loreSummary: inherited?.loreSummary ?? null,
+    // The encounter atlas covers every borough; a form's home district is not canon.
+    districtId: null,
+    // Item + mastery are documented cues, not executable EvolutionEvents.
+    evolutionUnlock: inherited?.evolutionUnlock ?? null,
   };
 }
 

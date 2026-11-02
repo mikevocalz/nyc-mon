@@ -2,14 +2,16 @@ diff --git a/android/react_viro/build.gradle b/android/react_viro/build.gradle
 index a117c4d641d80813724e251b12b564af6b78db74..ed7c9ea9c93ba6ff4c8a85f573428c2e09bf8535 100644
 --- a/android/react_viro/build.gradle
 +++ b/android/react_viro/build.gradle
-@@ -23,6 +23,8 @@ dependencies {
+@@ -23,6 +23,10 @@ dependencies {
  // Same AGP 8.12+ bundleAar guard as viro_renderer — see that build.gradle.
  afterEvaluate {
      tasks.matching {
 -        it.name.startsWith('bundle') && it.name.endsWith('Aar')
 +        // Not the *LocalLintAar tasks: release lint (lintVitalAnalyze*) reads
 +        // their output, and AGP's local-aar check only applies to publishing.
-+        it.name.startsWith('bundle') && it.name.endsWith('Aar') && !it.name.endsWith('LocalLintAar')
++        // verify*Resources cannot resolve AppCompat attrs for the local-AAR
++        // classpath — the prebuilt res only links at the consuming app.
++        (it.name.startsWith('bundle') && it.name.endsWith('Aar') && !it.name.endsWith('LocalLintAar')) || (it.name.startsWith('verify') && it.name.endsWith('Resources'))
      }.configureEach { enabled = false }
  }
 diff --git a/android/viro_renderer/build.gradle b/android/viro_renderer/build.gradle
@@ -26,14 +28,16 @@ index 21c54d67216c96ea6dcf9c7a8209b9391ea9fc0d..05eb5f460ce2d6fe911fbcbb54b089ad
      }
  
      flavorDimensions += "device"
-@@ -26,6 +29,8 @@ dependencies {
+@@ -26,6 +29,10 @@ dependencies {
  // task for every variant. Fixes 'hasLocalAarDeps' evaluation failure.
  afterEvaluate {
      tasks.matching {
 -        it.name.startsWith('bundle') && it.name.endsWith('Aar')
 +        // Not the *LocalLintAar tasks: release lint (lintVitalAnalyze*) reads
 +        // their output, and AGP's local-aar check only applies to publishing.
-+        it.name.startsWith('bundle') && it.name.endsWith('Aar') && !it.name.endsWith('LocalLintAar')
++        // verify*Resources cannot resolve AppCompat attrs for the local-AAR
++        // classpath — the prebuilt res only links at the consuming app.
++        (it.name.startsWith('bundle') && it.name.endsWith('Aar') && !it.name.endsWith('LocalLintAar')) || (it.name.startsWith('verify') && it.name.endsWith('Resources'))
      }.configureEach { enabled = false }
  }
 diff --git a/android/viro_renderer/consumer-rules.pro b/android/viro_renderer/consumer-rules.pro

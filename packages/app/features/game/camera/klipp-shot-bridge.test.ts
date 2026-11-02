@@ -13,6 +13,13 @@ import { cinematicCameraStore } from './cinematic-camera.store.ts';
 const shot: KlippCameraShot = { position: [10, 3, 8], quaternion: [0, 0, 0, 1], fov: 60, near: 0.1, far: 3000 };
 const chase = { position: [0, 160, 200] as const, target: [0, 1.2, 0] as const, near: 4, far: 3000 };
 
+test('sanitise preserves a positive frustum gap when near exceeds the maximum far', () => {
+  const clean = sanitizeKlippShot({ ...shot, near: 30_000, far: 40_000 })!;
+  assert.ok(clean.near < clean.far);
+  assert.equal(clean.far, 20_000);
+  assert.ok(clean.far - clean.near >= 0.099999);
+});
+
 function rig() {
   const camera = new THREE.PerspectiveCamera(50, 1.5, 0.5, 10_000);
   const r = createKlippShotRig(camera);
@@ -20,6 +27,22 @@ function rig() {
   r.setChase(chase.position, chase.target, chase.near, chase.far);
   return { camera, r };
 }
+
+test('resizing a settled offset shot reapplies normalized framing to the new viewport', () => {
+  const { camera, r } = rig();
+  r.setReducedMotion(true);
+  r.setShot({ ...shot, viewOffset: [0.25, -0.5] });
+  r.update(1);
+  r.update(0);
+  assert.equal(camera.view!.offsetX, -150);
+  r.setSize(600, 400);
+  r.update(0);
+  assert.equal(camera.view!.fullWidth, 600);
+  assert.equal(camera.view!.fullHeight, 400);
+  assert.equal(camera.view!.offsetX, -75);
+  assert.equal(camera.view!.offsetY, -100);
+  r.dispose();
+});
 
 test('the store sanitises a shot once, and clamps instead of rejecting', () => {
   cinematicCameraStore.getState().clear();

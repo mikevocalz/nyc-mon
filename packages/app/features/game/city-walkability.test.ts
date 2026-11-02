@@ -1,3 +1,4 @@
+import './classic-flags.test-support.ts';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { parseCityDataset } from './city-dataset.ts';

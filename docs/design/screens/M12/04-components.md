@@ -2,9 +2,8 @@
 
 | Element | Component / variant | Props | Status |
 |---|---|---|---|
-| Shell | `HLynkShell` | `scheme="night"`, `status={{ led: 'ready', label }}` until `scanner`, `trackpad.accent='hatch'`, `testIDPrefix="m12"` | exists |
-| Case | `CaptureCase` (from M11) | `lid`, `lidProgress`, `seam="lit"` | NEW (M11) |
-| Egg in the cradle | `HatchEgg` | see below | **NEW** |
+| Shell | `HLynkShell` | `scheme="night"`, `status={{ led: 'ready', label }}` throughout, `trackpad.accent='hatch'`, `testIDPrefix="m12"` | exists |
+| Egg | `HatchEgg` inside an `Animated.View` carrying the `stir`/`pressure` pose (`eggPrecrackPose`) | see below | **NEW** |
 | Burst | `HatchBurst` | see below | **NEW** (TypeGPU later, §3.3; Skia now) |
 | Creature layer | `CreatureStage` in `/(home)/_layout.tsx` | see below | **NEW** |
 | Name plate | `SignagePlate` (M07 contract) | `text={babyFormName}`, `maxSize='station'` | NEW in M07, reused |
@@ -28,7 +27,9 @@ export interface HatchEggProps {
 }
 ```
 
-2D now needs **cut-out egg art** (transparent background) per line plus three crack overlays. The existing `metro-egg.webp` etc. are scene paintings with the egg on a step and can't sit inside the case. Until cut-outs exist, the fallback is the `hatch-night.webp` plate (an egg in an open case with a glowing crack) for all three lines, which is honest but generic.
+2D now needs **cut-out egg art** (transparent background) per line plus three crack overlays. The existing `metro-egg.webp` etc. are scene paintings with the egg on a step. Until cut-outs exist, the screen passes the egg still for the line.
+
+> Superseded by Decision 29 (2026-10-21): the `CaptureCase` row and the `hatch-night.webp` fallback (an egg in an open case) are removed. M12 renders no case; `CaptureCase` stays in the kit for the capture mechanic only.
 
 ## NEW `HatchBurst`
 
@@ -50,7 +51,7 @@ Lives in `/(home)/_layout.tsx` under the shell's screen slot, so route changes n
 
 ```ts
 export interface CreatureStageProps {
-  /** `null` while an egg incubates (M11 draws the case instead). */
+  /** `null` while an egg incubates (M11 draws the egg still instead). */
   scene: MonSceneInput | null;           // from selectSceneInput(...)
   /** Framing preset; the transition between presets is the continuity move. */
   framing: 'hatch-closeup' | 'home' | 'naming';
@@ -68,7 +69,7 @@ export interface CreatureStageProps {
 
 ## Variant: haptics façade
 
-Add semantic verbs over verified `react-native-pulsar` 1.7.0 presets: `hatchLatch` (`latch`), `hatchCrack` (`snap`), `hatchBloom` (`bloom`), `hatchEmerge` (`unfurl`), `firstLook` (`heartbeat`), plus `warm` (`breath`, from M11). Components keep calling the façade, never Pulsar directly.
+Add semantic verbs over verified `react-native-pulsar` 1.7.0 presets: `hatchCrack` (`snap`), `hatchBloom` (`bloom`), `hatchEmerge` (`unfurl`), `firstLook` (`heartbeat`), plus `warm` (`breath`, from M11). Components keep calling the façade, never Pulsar directly. `hatchLatch` (`latch`) was the case-lid beat and is no longer called on M12 (Decision 29, 2026-10-21); `stir` uses `tap`.
 
 ## Token diffs
 

@@ -192,18 +192,18 @@ const CONTRACT: Pair[] = [
 const USAGE: Pair[] = [
   // -- semantic text on theme surfaces (themed: measured light and dark) ----
   { id: 'text on surface', fg: 'text', bg: ['surface'], role: 'text', usedAt: ['packages/ui/Text.tsx:39', 'packages/ui/Heading.tsx:25'] },
-  { id: 'muted text on surface', fg: 'text-muted', bg: ['surface'], role: 'text', usedAt: ['packages/ui/Text.tsx:40', 'apps/mobile/components/AppTabBar.tsx:86', 'packages/app/features/schedule/BookingSurface.tsx:63'] },
+  { id: 'muted text on surface', fg: 'text-muted', bg: ['surface'], role: 'text', usedAt: ['packages/ui/Text.tsx:40', 'packages/app/features/navigation/ShellNav.tsx:67', 'packages/app/features/schedule/BookingSurface.tsx:63'] },
   { id: 'muted text on raised', fg: 'text-muted', bg: ['surface-raised'], role: 'text', usedAt: ['packages/app/features/home/home-content.tsx:76', 'packages/ui/Text.tsx:40'] },
   { id: 'primary text on surface', fg: 'primary', bg: ['surface'], role: 'large-text', usedAt: ['packages/app/features/error/screen.shared.tsx:19'], reason: 'font-display text-display-xl (60px)' },
   { id: 'primary text on raised', fg: 'primary', bg: ['surface-raised'], role: 'text', usedAt: ['packages/ui/Text.tsx:42', 'packages/ui/Heading.tsx:27'] },
   { id: 'primary icon in primary/10 well', fg: 'primary', bg: ['surface-raised', 'primary/10'], role: 'ui', usedAt: ['packages/app/features/home/home.data.ts:28', 'packages/app/features/home/home.data.ts:33'] },
   { id: 'accent text on raised', fg: 'accent', bg: ['surface-raised'], role: 'text', usedAt: ['packages/ui/Text.tsx:41', 'packages/app/features/home/home-content.tsx:77', 'packages/app/features/editor/AttachSheet.tsx:88'] },
   { id: 'accent icon in accent/10 well', fg: 'accent', bg: ['surface-raised', 'accent/10'], role: 'ui', usedAt: ['packages/app/features/home/home.data.ts:29', 'packages/app/features/home/home.data.ts:34'] },
-  { id: 'accent bell icon on raised', fg: 'accent', bg: ['surface-raised'], role: 'ui', usedAt: ['apps/mobile/components/AppHeader.tsx:69'] },
+  { id: 'accent bell icon on raised', fg: 'accent', bg: ['surface-raised'], role: 'ui', usedAt: ['apps/mobile/components/AppHeader.tsx:68'] },
   { id: 'danger text on raised', fg: 'danger', bg: ['surface-raised'], role: 'text', usedAt: ['packages/ui/Text.tsx:44', 'packages/app/features/editor/AttachSheet.tsx:168'] },
-  { id: 'on-primary on primary', fg: 'on-primary', bg: ['primary'], role: 'text', usedAt: ['packages/app/features/home/home-content.tsx:48', 'packages/app/features/explore/explore.store.ts:17', 'apps/mobile/components/AppTabBar.tsx:86'] },
+  { id: 'on-primary on primary', fg: 'on-primary', bg: ['primary'], role: 'text', usedAt: ['packages/app/features/home/home-content.tsx:48', 'packages/app/features/explore/explore.store.ts:17', 'packages/app/features/navigation/ShellNav.tsx:67'] },
   { id: 'on-primary/90 on primary', fg: 'on-primary/90', bg: ['primary'], role: 'text', usedAt: ['packages/app/features/home/home-content.tsx:53', 'packages/app/features/home/home-content.tsx:54'] },
-  { id: 'on-primary on primary-pressed', fg: 'on-primary', bg: ['primary-pressed'], role: 'text', usedAt: ['packages/app/features/explore/explore.store.ts:18', 'apps/mobile/components/AppTabBar.tsx:78'] },
+  { id: 'on-primary on primary-pressed', fg: 'on-primary', bg: ['primary-pressed'], role: 'text', usedAt: ['packages/app/features/explore/explore.store.ts:18', 'packages/app/features/navigation/ShellNav.tsx:63'] },
   { id: 'on-accent on accent', fg: 'on-accent', bg: ['accent'], role: 'text', usedAt: ['packages/app/features/explore/explore.store.ts:19'] },
   { id: 'inverse text on text', fg: 'text-inverse', bg: ['text'], role: 'text', usedAt: ['packages/ui/Text.tsx:43', 'packages/ui/Heading.tsx:29'] },
   { id: 'out-of-month day', fg: 'text-muted', bg: ['surface-raised'], role: 'text', usedAt: ['packages/app/features/schedule/MiniCalendar.tsx:111'], reason: 'days stay readable and pressable (onSelect); muted colour, not opacity, marks them as outside the month' },
@@ -218,8 +218,8 @@ const USAGE: Pair[] = [
   { id: 'nav action edge', fg: 'orange-500', bg: NIGHT, role: 'ui', usedAt: ['packages/ui/nav/NavBar.tsx:92', 'packages/ui/nav/NavBar.tsx:99'] },
   { id: 'profile ring active', fg: 'orange-500', bg: NIGHT, role: 'ui', usedAt: ['apps/web/components/site/SiteChrome.tsx:47'], reason: 'ring-offset-ink-950 puts the night bar between the avatar and the ring' },
   { id: 'profile ring hover', fg: 'silver-400', bg: NIGHT, role: 'ui', usedAt: ['apps/web/components/site/SiteChrome.tsx:47'] },
-  { id: 'unread dot', fg: 'danger', bg: ['surface-raised'], role: 'ui', usedAt: ['apps/mobile/components/AppHeader.tsx:70'] },
-  { id: 'theme border', fg: 'border', bg: ['surface-raised'], role: 'decorative', usedAt: ['apps/mobile/components/AppHeader.tsx:67'], reason: 'frame on controls whose text label or icon identifies them; separators' },
+  { id: 'unread dot', fg: 'danger', bg: ['surface-raised'], role: 'ui', usedAt: ['apps/mobile/components/AppHeader.tsx:69'] },
+  { id: 'theme border', fg: 'border', bg: ['surface-raised'], role: 'decorative', usedAt: ['apps/mobile/components/AppHeader.tsx:66'], reason: 'frame on controls whose text label or icon identifies them; separators' },
   { id: 'neon glow', fg: 'glow', bg: ['bg'], role: 'decorative', usedAt: ['packages/theme/tokens.ts:340', 'packages/ui/district/tones.ts:132'], reason: 'box-shadow halo behind a surface that already has its own edge; fully transparent on daylit (no glow in daylight)' },
   { id: 'hot glow', fg: 'glow-hot', bg: ['bg'], role: 'decorative', usedAt: ['packages/theme/tokens.ts:343'], reason: 'box-shadow halo behind a surface that already has its own edge; fully transparent on daylit (no glow in daylight)' },
 
@@ -291,8 +291,8 @@ const USAGE: Pair[] = [
   // so these rows measure those steps. Before that, Next settled the tokens at
   // :root and a light page painted text-text black on night (/profile Account
   // card, 1.06:1).
-  { id: 'card themed heading on night face', fg: 'ink-50', bg: NIGHT, role: 'text', usedAt: ['packages/theme/theme.css:328', 'packages/app/features/profile/profile-content.tsx:100'], reason: 'text-text inside a cornerCut or beam Card resolves to ink-50 on the face' },
-  { id: 'card themed muted on night face', fg: 'silver-500', bg: NIGHT, role: 'text', usedAt: ['packages/theme/theme.css:329', 'packages/theme/theme.css:330', 'packages/app/features/profile/profile-content.tsx:101'], reason: 'text-muted and text-secondary inside the Card face resolve to silver-500' },
+  { id: 'card themed heading on night face', fg: 'ink-50', bg: NIGHT, role: 'text', usedAt: ['packages/theme/theme.css:328', 'packages/app/features/game/controls-settings/ControlsSettingsScreen.tsx:328'], reason: 'text-text inside a cornerCut or beam Card resolves to ink-50 on the face' },
+  { id: 'card themed muted on night face', fg: 'silver-500', bg: NIGHT, role: 'text', usedAt: ['packages/theme/theme.css:329', 'packages/theme/theme.css:330', 'packages/app/features/game/controls-settings/ControlsSettingsScreen.tsx:329'], reason: 'text-muted and text-secondary inside the Card face resolve to silver-500' },
   { id: 'card themed primary on night face', fg: 'orange-500', bg: NIGHT, role: 'text', usedAt: ['packages/theme/theme.css:332'] },
   { id: 'card themed accent on night face', fg: 'carolina-500', bg: NIGHT, role: 'text', usedAt: ['packages/theme/theme.css:338', 'packages/theme/theme.css:349'], reason: 'accent and info share carolina-500 on the face' },
   { id: 'card themed success on night face', fg: 'leaf-500', bg: NIGHT, role: 'text', usedAt: ['packages/theme/theme.css:345'] },
@@ -398,10 +398,10 @@ const USAGE: Pair[] = [
   { id: 'hlynk: reduced-motion LED cue in the black head', fg: 'led-on', bg: ['hlynk-core-black'], role: 'ui', usedAt: ['packages/ui/hlynk/ScannerLed.tsx:96', 'packages/ui/hlynk/ScannerLed.tsx:104', 'packages/ui/hlynk/ScannerLed.tsx:107'], reason: 'tick row, filled dot and exclamation dot that stand in for the LED rhythm' },
 
   // -- text on the ink plate over a scene (SolidPanel tone="ink": ink-800 face in both themes)
-  { id: 'scene plate headline', fg: 'orange-500', bg: ['ink-800'], role: 'large-text', usedAt: ['packages/app/features/explore/explore-content.tsx:22', 'packages/app/features/profile/profile-content.tsx:46', 'packages/app/features/error/screen.shared.tsx:25'], reason: 'display-sm heading and the display-xl 404 on the plate' },
+  { id: 'scene plate headline', fg: 'orange-500', bg: ['ink-800'], role: 'large-text', usedAt: ['packages/app/features/explore/explore-content.tsx:22', 'packages/app/features/profile/profile-content.tsx:34', 'packages/app/features/error/screen.shared.tsx:25'], reason: 'display-sm heading and the display-xl 404 on the plate' },
   { id: 'scene plate title', fg: 'ink-50', bg: ['ink-800'], role: 'large-text', usedAt: ['packages/app/features/error/screen.shared.tsx:29'] },
-  { id: 'scene plate body', fg: 'silver-200', bg: ['ink-800'], role: 'text', usedAt: ['packages/app/features/profile/profile-content.tsx:47', 'packages/app/features/error/screen.shared.tsx:32'] },
-  { id: 'scene plate line', fg: 'silver-300', bg: ['ink-800'], role: 'text', usedAt: ['packages/app/features/explore/explore-content.tsx:43', 'packages/app/features/profile/profile-content.tsx:45'] },
+  { id: 'scene plate body', fg: 'silver-200', bg: ['ink-800'], role: 'text', usedAt: ['packages/app/features/error/screen.shared.tsx:32'] },
+  { id: 'scene plate line', fg: 'silver-300', bg: ['ink-800'], role: 'text', usedAt: ['packages/app/features/explore/explore-content.tsx:43', 'packages/app/features/profile/profile-content.tsx:33'] },
   { id: 'scene plate tab label', fg: 'silver-200', bg: ['ink-900'], role: 'text', usedAt: ['packages/app/features/explore/explore-content.tsx:25'] },
   { id: 'scene plate tab edge', fg: 'ink-400', bg: ['ink-800'], role: 'ui', usedAt: ['packages/app/features/explore/explore-content.tsx:23'] },
   { id: 'scene plate selected tab label', fg: 'ink-950', bg: ['orange-500'], role: 'text', usedAt: ['packages/app/features/explore/explore-content.tsx:26'] },

@@ -33,7 +33,15 @@ export const RIVE_QUIET_MS = 600;
 import type { ArcadeRiveSurfaceProps } from './ArcadeRiveSurface.types.ts';
 
 export function ArcadeRiveSurface({ riveFile, artboardName, stateMachineName, onBinding, diagnosticsName, style }: ArcadeRiveSurfaceProps) {
-  const { instance } = useViewModelInstance(riveFile, { async: true });
+  // With the merged file (EXPO_PUBLIC_ARCADE_MERGED_RIVE) the artboard selects
+  // the view model — the file's default artboard is always LeftStick. On the
+  // three-file path every file's default is its own artboard, so passing the
+  // name is a no-op (Thumbpad's view model is the shared LeftStick one
+  // either way).
+  const { instance } = useViewModelInstance(
+    riveFile,
+    artboardName ? { async: true, artboardName } : { async: true },
+  );
   const binding = useRef<ArcadeRiveBinding | null>(null);
   // The Android view stops advancing once its state machine settles, and a
   // view model write does not wake it (rive-android only wakes on pointer

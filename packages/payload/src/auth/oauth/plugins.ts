@@ -18,8 +18,17 @@ export const OAUTH_PAGES = {
   refused: '/oauth/refused',
 } as const;
 
-/** Amazon recommends `expires_in` of at most an hour. */
+/** Amazon recommends `expires_in` of at most an hour. Service (client_credentials) tokens keep the hour. */
 export const ACCESS_TOKEN_TTL_SECONDS = 3600;
+/**
+ * A Caller's access token (Alexa and the companion alike). The MCP server
+ * verifies JWTs locally, so a token outlives sign-out and revocation until
+ * it expires (Gate 4). Ten minutes bounds that window; refresh tokens rotate
+ * and sign-out revokes them (RFC 7009), so a signed-in client just refreshes.
+ * The provider sets lifetimes per resource, not per client, and both clients
+ * use the one MCP resource, so this applies to both.
+ */
+export const USER_ACCESS_TOKEN_TTL_SECONDS = 600;
 /** A linked Alexa account refreshes for 90 days without re-linking. */
 export const REFRESH_TOKEN_TTL_SECONDS = 90 * 24 * 3600;
 export const AUTHORIZATION_CODE_TTL_SECONDS = 300;
@@ -60,7 +69,7 @@ export function alexaOAuthPlugins(config: OAuthServerConfig, nowMs: () => number
       resourceSeedMode: 'overwrite',
       enforcePerClientResources: true,
       cachedTrustedClients: new Set(config.clients.map((client) => client.clientId)),
-      accessTokenExpiresIn: ACCESS_TOKEN_TTL_SECONDS,
+      accessTokenExpiresIn: USER_ACCESS_TOKEN_TTL_SECONDS,
       m2mAccessTokenExpiresIn: ACCESS_TOKEN_TTL_SECONDS,
       refreshTokenExpiresIn: REFRESH_TOKEN_TTL_SECONDS,
       codeExpiresIn: AUTHORIZATION_CODE_TTL_SECONDS,

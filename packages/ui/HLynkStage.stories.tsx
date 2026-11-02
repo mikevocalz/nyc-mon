@@ -7,11 +7,12 @@ import { Text } from './Text';
 import { View } from './tw';
 
 /**
- * The companion loop's shell host. Since Decision H-2
- * (docs/design/hlynk/ADAPTIVE.md) the side panes are struck: `leading` and
- * `trailing` are ignored, and from 600 dp the shell itself draws the NYC-MON
- * pane on the left and the device on the right. These stories keep the old
- * pane props to show that they no longer render.
+ * The companion loop's shell host. From `md` the stage shows one companion
+ * pane beside the shell (landscape: pane left, shell right, the open-foldable
+ * layout) or under it (portrait); below `md` the pane is hidden and screens
+ * draw the same content inside the H-Lynk screen. Breakpoint and orientation
+ * classes drive it, so these fixed-size frames show the layout of whichever
+ * window Storybook runs in.
  */
 const meta = {
   title: 'H-Lynk/HLynkStage',
@@ -41,7 +42,7 @@ const Panel = ({ title }: { title: string }) => (
   </View>
 );
 
-/** Quest default: 1280 × 800. Both panes, shell centred. */
+/** Quest default: 1280 × 800. Leading and trailing stacked in the companion pane, shell on the right. */
 export const QuestWindow: Story = {
   args: { children: null },
   render: () => (
@@ -53,7 +54,7 @@ export const QuestWindow: Story = {
   ),
 };
 
-/** Trailing pane only: the leading pane stays as an empty column so the shell does not shift. */
+/** Trailing content only: it alone fills the companion pane. */
 export const TrailingOnly: Story = {
   args: { children: null },
   render: () => (

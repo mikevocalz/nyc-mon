@@ -33,7 +33,8 @@ export function HLynkBrandPane({ widthPt, heightPt, scheme, reducedMotion, testI
       {scheme === 'night' ? (
         <GridFloor district="midtown" skyline horizon={0.55} speed={0.3} paused={reducedMotion} className="absolute inset-0" />
       ) : (
-        <View className="absolute bottom-0 left-0 right-0">
+        // Daylit from md: HLynkShell draws the skyline across the whole bottom edge.
+        <View className="absolute bottom-0 left-0 right-0 md:hidden">
           <SkylineDivider district="midtown" size="lg" still={reducedMotion} />
         </View>
       )}

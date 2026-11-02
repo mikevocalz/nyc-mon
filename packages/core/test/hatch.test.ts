@@ -54,7 +54,7 @@ describe('egg records and the offline mint', () => {
   it('mints a Baby with hatchedAt at incubation end, independent of when it is opened', () => {
     const mon = mintMonInstance(egg);
     expect(MonInstanceSchema.parse(mon)).toEqual(mon);
-    expect(mon).toMatchObject({ monInstanceId: egg.monInstanceId, stage: 'Baby', hatchedAt: READY_AT, voiceLineageId: null });
+    expect(mon).toMatchObject({ monInstanceId: egg.monInstanceId, stage: 'Baby', hatchedAt: READY_AT });
     const late = monOf(run([{ type: 'open', now: READY_AT + 5 * 24 * 60 * MINUTE }]));
     expect(late).toEqual(mon);
   });

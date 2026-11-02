@@ -11,7 +11,8 @@
 // - light pools: additive discs under the nearest lamps, refreshed as the
 //   Caller walks (preallocated, no allocation per refresh)
 import type { Three } from '@acme/ui/three';
-import type { CityDatasetV2 } from '../city-dataset.ts';
+import { CURB_HEIGHT } from './curb.ts';
+import type { CityDatasetV3 } from '../city-dataset.ts';
 import { shadowBands, SHADOW_BAND_METRES } from './city-mesh.ts';
 import { emitText, type TextFace } from './lettering.ts';
 import type { CityMaterials } from './materials.ts';
@@ -38,17 +39,17 @@ const linearRgb = (key: CityColor) => hexToRgb(CITY_COLORS[key]);
 export const measureText = (text: string) => layoutText(text).width * PIXEL;
 
 /** Signs and streetlights for a tile, every base outside the carriageways (walkability.ts clearance). Pure apart from the clearance. */
-export function placeStreetFurniture(dataset: CityDatasetV2, clearance: StreetClearance) {
+export function placeStreetFurniture(dataset: CityDatasetV3, clearance: StreetClearance) {
   const apollo = dataset.landmarks.find((l) => l.key === 'apollo-theater');
   const centre: [number, number] = apollo ? [apollo.x, apollo.z] : [0, 0];
   const crosses = findIntersections(dataset.roads);
   const signs = placeSigns(crosses, centre, measureText, MAX_SIGNS, clearance.standable);
-  const lights = placeStreetlights(dataset.roads, centre, MAX_STREETLIGHTS, clearance.standable);
+  const lights = placeStreetlights(dataset.roads, centre, MAX_STREETLIGHTS, clearance.standable, crosses);
   return { signs, lights, intersections: crosses.length };
 }
 
 export function buildStreetFurniture(
-  THREE: Three, dataset: CityDatasetV2, materials: Pick<CityMaterials, 'poles' | 'signBlades' | 'lampHeads' | 'lampPools' | 'lettering'>,
+  THREE: Three, dataset: CityDatasetV3, materials: Pick<CityMaterials, 'poles' | 'signBlades' | 'lampHeads' | 'lampPools' | 'lettering'>,
   clearance: StreetClearance = createStreetClearance(dataset),
   extraTexts: readonly (TextFace & { text: string })[] = [],
 ) {
@@ -68,11 +69,11 @@ export function buildStreetFurniture(
   poles.name = 'city:poles';
   let p = 0;
   for (const sign of signs) {
-    matrix.compose(position.set(sign.x, 0, sign.z), rotation.identity(), scale.set(0.05, SIGN_POLE_HEIGHT, 0.05));
+    matrix.compose(position.set(sign.x, CURB_HEIGHT, sign.z), rotation.identity(), scale.set(0.05, SIGN_POLE_HEIGHT, 0.05));
     poles.setMatrixAt(p++, matrix);
   }
   for (const light of lights) {
-    matrix.compose(position.set(light.x, 0, light.z), rotation.identity(), scale.set(0.09, LIGHT_POLE_HEIGHT, 0.09));
+    matrix.compose(position.set(light.x, CURB_HEIGHT, light.z), rotation.identity(), scale.set(0.09, LIGHT_POLE_HEIGHT, 0.09));
     poles.setMatrixAt(p++, matrix);
   }
   poles.count = p;
@@ -85,7 +86,7 @@ export function buildStreetFurniture(
   for (const sign of signs) {
     for (const blade of sign.blades) {
       rotation.setFromAxisAngle(up, yawOf(blade.dir[0], blade.dir[1]));
-      matrix.compose(position.set(sign.x, blade.y, sign.z), rotation, scale.set(blade.length, BLADE_HEIGHT, BLADE_THICKNESS));
+      matrix.compose(position.set(sign.x, blade.y + CURB_HEIGHT, sign.z), rotation, scale.set(blade.length, BLADE_HEIGHT, BLADE_THICKNESS));
       blades.setMatrixAt(b++, matrix);
     }
   }
@@ -122,7 +123,7 @@ export function buildStreetFurniture(
   const poolZ = new Float32Array(lights.length);
   lights.forEach((light, i) => {
     rotation.setFromAxisAngle(up, yawOf(light.face[0], light.face[1]));
-    matrix.compose(position.set(light.x + light.face[0] * 0.6, LIGHT_POLE_HEIGHT - 0.05, light.z + light.face[1] * 0.6), rotation, scale.set(1, 1, 1));
+    matrix.compose(position.set(light.x + light.face[0] * 0.6, LIGHT_POLE_HEIGHT - 0.05 + CURB_HEIGHT, light.z + light.face[1] * 0.6), rotation, scale.set(1, 1, 1));
     heads.setMatrixAt(i, matrix);
     poolX[i] = light.x + light.face[0] * 1.8;
     poolZ[i] = light.z + light.face[1] * 1.8;
@@ -146,7 +147,8 @@ export function buildStreetFurniture(
 
   let lastX = Number.NaN;
   let lastZ = Number.NaN;
-  let shownBands: [number, number] = [-1, -1];
+  const shownBands: [number, number] = [-1, -1];
+  const bands: [number, number] = [0, 0];
   const objects = [poles, blades, heads, pools, ...(letters ? [letters] : [])];
   return {
     objects,
@@ -156,10 +158,11 @@ export function buildStreetFurniture(
     /** Lettering bands and light pools follow the Caller. Allocation-free. */
     setFocus(x: number, z: number) {
       if (letterGeometry) {
-        const [first, last] = shadowBands(z, minZ, bandCount);
-        if (first !== shownBands[0] || last !== shownBands[1]) {
-          shownBands = [first, last];
-          letterGeometry.setDrawRange(bandStart[first]!, bandStart[last + 1]! - bandStart[first]!);
+        shadowBands(z, minZ, bandCount, bands);
+        if (bands[0] !== shownBands[0] || bands[1] !== shownBands[1]) {
+          shownBands[0] = bands[0];
+          shownBands[1] = bands[1];
+          letterGeometry.setDrawRange(bandStart[bands[0]]!, bandStart[bands[1] + 1]! - bandStart[bands[0]]!);
         }
       }
       if (Math.hypot(x - lastX, z - lastZ) <= TREE_REFRESH_METRES) return;

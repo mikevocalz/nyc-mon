@@ -1,0 +1,35 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.nycmon'
+version = '0.1.0'
+
+/*
+ * Expo Modules 2.0, same as the sibling reserved-regions module: the
+ * expo-modules-core 58 gradle plugin reads `v2 true` and applies the
+ * expo-modules-v2 compiler, which discovers @ExpoModule / @JS / @Record
+ * declarations at compile time and exposes the object through
+ * globalThis.expoV2.modules. The runtime artifact
+ * (io.github.expo:expo-modules-v2-react) arrives through expo-modules-core's
+ * own api(...) dependency.
+ */
+expoModule {
+  canBePublished false
+  v2 true
+}
+
+android {
+  namespace "com.nycmon.gameperf"
+  defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
+  }
+}
+
+dependencies {
+  // UiThreadUtil: the frame-rate vote and hint-session wakes must land on the
+  // main thread (Window attributes, Choreographer-affine state).
+  implementation 'com.facebook.react:react-android'
+}

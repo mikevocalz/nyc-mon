@@ -15,15 +15,29 @@
 // reports neither to logcat nor to Metro, so a stalled start used to show
 // nothing at all (Surface Duo, 2026-10-16: loadProgress stuck at 0).
 
-/** Events from the render runtime. `detail` is a stage, a breadcrumb, or a formatted error. */
-export type GameRenderEventKind = 'backend' | 'stage' | 'firstFrame' | 'failed' | 'trace' | 'error';
+/** Events from the render runtime. `detail` is a stage, a breadcrumb, a formatted error, or a JSON perf summary. */
+export type GameRenderEventKind = 'backend' | 'stage' | 'firstFrame' | 'failed' | 'trace' | 'error' | 'perf' | 'load';
 
-/** The load milestones the runtime may report (game-session.ts LOAD_STAGES, minus `done`, which `firstFrame` sets). */
-export const RUNTIME_LOAD_STAGES = ['requested', 'moduleLoaded', 'worldBuilt', 'firstRender'] as const;
+/** The load stages the runtime may report (game-session.ts LOAD_STAGES, minus `done`, which `firstFrame` sets). */
+export const RUNTIME_LOAD_STAGES = ['requested', 'moduleLoaded', 'worldBuilt', 'compile', 'firstRender'] as const;
 export type RuntimeLoadStage = (typeof RUNTIME_LOAD_STAGES)[number];
 
 export function isRuntimeLoadStage(value: string): value is RuntimeLoadStage {
   return (RUNTIME_LOAD_STAGES as readonly string[]).includes(value);
+}
+
+/** A stage event's detail: the stage, then `:` and how far through it (0..1) for a partial report. */
+export function formatRuntimeStage(stage: RuntimeLoadStage, fraction?: number): string {
+  return fraction === undefined ? stage : `${stage}:${Math.round(fraction * 1000) / 1000}`;
+}
+
+/** The stage and fraction of a stage event's detail, or null for anything else. */
+export function parseRuntimeStage(detail: string): { stage: RuntimeLoadStage; fraction?: number } | null {
+  const [stage, part] = detail.split(':');
+  if (stage === undefined || !isRuntimeLoadStage(stage)) return null;
+  if (part === undefined) return { stage };
+  const fraction = Number(part);
+  return Number.isFinite(fraction) ? { stage, fraction } : null;
 }
 
 /**
@@ -42,12 +56,13 @@ export function describeRuntimeError(where: string, error: unknown): string {
 /**
  * three.js reads the frame loop through `self`: Renderer.init() builds an
  * Animation whose `_context` is `typeof self !== 'undefined' ? self : null`
- * and then calls `_context.requestAnimationFrame` (three r186,
- * renderers/common/Animation.js). React Native defines `self` in
+ * and calls `_context.requestAnimationFrame` when Animation starts. In r186
+ * that happened during init; r187 defers it until rendering or setAnimationLoop.
+ * React Native defines `self` in
  * setUpGlobals.js, but that runs from InitializeCore, which a worklet runtime
  * never runs (worklets' ScriptLoader intercepts Metro's entry points). With
- * `self` undefined the call throws inside init()'s async promise executor:
- * the rejection is unhandled and `init()` never settles, so the city is never
+ * `self` undefined in r186 the call threw inside init()'s async promise executor:
+ * the rejection was unhandled and `init()` never settled, so the city was never
  * built and no milestone after `requested` ever arrives.
  *
  * This aliases `self` to the runtime's global, as setUpGlobals.js does on the
@@ -64,7 +79,7 @@ export function installFrameGlobals(target: Record<string, unknown> = globalThis
 export interface RenderEventSinks {
   log: (message: string) => void;
   error: (message: string) => void;
-  loadStage: (stage: RuntimeLoadStage) => void;
+  loadStage: (stage: RuntimeLoadStage, fraction?: number) => void;
 }
 
 /**
@@ -80,14 +95,30 @@ export function routeRenderEvent(kind: GameRenderEventKind, detail: string, sink
     case 'error':
       sinks.error(`[GameRender] render runtime error in ${detail}`);
       return true;
-    case 'stage':
-      if (isRuntimeLoadStage(detail)) {
-        sinks.log(`[GameRender] load stage: ${detail}`);
-        sinks.loadStage(detail);
+    case 'perf':
+      // Same logcat tag as the JS-path probe (record-city-frame.ts); this one
+      // measures the draw's CPU cost and interval on the render runtime.
+      sinks.log(`[NYC-Mon/perf] worklet render submission ${detail}`);
+      return true;
+    case 'load':
+      // load-game-scene.ts timing lines, already prefixed `[NYC-Mon/load]`.
+      sinks.log(detail);
+      return true;
+    case 'stage': {
+      const parsed = parseRuntimeStage(detail);
+      if (parsed) {
+        // Partial reports arrive a percent at a time; the log keeps the whole stages.
+        if (parsed.fraction === undefined) {
+          sinks.log(`[GameRender] load stage: ${detail}`);
+          sinks.loadStage(parsed.stage);
+        } else {
+          sinks.loadStage(parsed.stage, parsed.fraction);
+        }
       } else {
         sinks.error(`[GameRender] unknown load stage from the render runtime: ${detail}`);
       }
       return true;
+    }
     default:
       return false;
   }

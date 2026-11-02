@@ -32,3 +32,8 @@ export function scheduleReadyNotification(_input: ReadyNotification): Promise<bo
 export function clearReadyNotification(_eggId: string): Promise<void> {
   return Promise.resolve();
 }
+
+/** M19 Notifications off; nothing is ever scheduled on web. */
+export function cancelReadyNotifications(): Promise<void> {
+  return Promise.resolve();
+}

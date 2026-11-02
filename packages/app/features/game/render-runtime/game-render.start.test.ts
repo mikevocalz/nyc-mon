@@ -4,6 +4,7 @@
 // that supports init but not buffer creation. Checks that every milestone up
 // to the compile is reported, and that a failure later on reaches the JS side
 // as an `error` with a stack plus `failed`, instead of vanishing.
+import '../classic-flags.test-support.ts';
 import assert from 'node:assert/strict';
 import { register } from 'node:module';
 import { test } from 'node:test';
@@ -75,8 +76,14 @@ test('startGameRender reports each stage, then surfaces the first GPU failure wi
     'renderer init resolved',
   ]);
   assert.ok(traces.includes('scene built'), traces.join(' | '));
+  // EXPO_PUBLIC_WORLD_PHYSICAL is unset here: no shared-device resolution and no probe ran.
+  assert.ok(!traces.some((t) => t.startsWith('renderer device:') || t.startsWith('probe ')), traces.join(' | '));
   assert.ok(traces.includes('compileAsync started'), traces.join(' | '));
-  assert.deepEqual(stages.slice(0, 2), ['moduleLoaded', 'worldBuilt']);
+  // Whole stages in order; the world build's checkpoints (worldBuilt:0.1 ...) arrive between them, rising.
+  assert.deepEqual(stages.filter((d) => !d.includes(':')).slice(0, 2), ['moduleLoaded', 'worldBuilt']);
+  const partial = stages.filter((d) => d.startsWith('worldBuilt:')).map((d) => Number(d.split(':')[1]));
+  assert.ok(partial.length >= 4 && partial.every((f, i) => i === 0 || f > partial[i - 1]!), stages.join(' | '));
+  assert.ok(stages.indexOf('worldBuilt') > stages.indexOf(`worldBuilt:${partial.at(-1)}`), 'checkpoints come before the stage ends');
   assert.ok(events.some((e) => e.kind === 'backend' && e.detail === 'webgpu'));
 
   const error = events.find((e) => e.kind === 'error');

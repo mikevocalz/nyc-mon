@@ -213,6 +213,8 @@ export const LIGHT_SPACING = 32;
 export const LIGHT_SETBACK = 0.8;
 export const LIGHT_POLE_HEIGHT = 7.6;
 export const MAX_LIGHTS = 900;
+/** No streetlight within this many metres of an intersection: the corner belongs to the signal mast and the sign. */
+export const LIGHT_CORNER_CLEAR = 12;
 
 export interface LightPlacement { x: number; z: number; /** Unit vector from the pole toward the carriageway centre. */ face: Point; distance: number }
 
@@ -222,8 +224,12 @@ export interface LightPlacement { x: number; z: number; /** Unit vector from the
  * Positions `standable` rejects are skipped. Nearest the centre first, at
  * most `cap`.
  */
-export function placeStreetlights(roads: readonly CityRoad[], centre: Point, cap = MAX_LIGHTS, standable: Standable = () => true): LightPlacement[] {
+export function placeStreetlights(
+  roads: readonly CityRoad[], centre: Point, cap = MAX_LIGHTS, standable: Standable = () => true,
+  corners: readonly { x: number; z: number }[] = [],
+): LightPlacement[] {
   const out: LightPlacement[] = [];
+  const nearCorner = (x: number, z: number) => corners.some((c) => Math.hypot(x - c.x, z - c.z) < LIGHT_CORNER_CLEAR);
   for (const road of roads) {
     if (!LIGHT_CLASSES.has(road.class)) continue;
     const p = road.points;
@@ -241,7 +247,7 @@ export function placeStreetlights(roads: readonly CityRoad[], centre: Point, cap
         const nx = dz * side; const nz = -dx * side;
         const x = ax + dx * t + nx * off; const z = az + dz * t + nz * off;
         // A pole that would land in a crossing, a cross street or a building is left out.
-        if (standable(x, z)) out.push({ x, z, face: [-nx, -nz], distance: Math.hypot(x - centre[0], z - centre[1]) });
+        if (standable(x, z) && !nearCorner(x, z)) out.push({ x, z, face: [-nx, -nz], distance: Math.hypot(x - centre[0], z - centre[1]) });
         side = -side;
         t += LIGHT_SPACING;
       }

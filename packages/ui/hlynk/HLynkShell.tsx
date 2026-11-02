@@ -14,6 +14,7 @@ import { ShellHiddenContext } from './hidden-context';
 import { Announcer } from './Announcer';
 import { HLYNK_COPY } from './copy';
 import { HLynkBrandPane } from './HLynkBrandPane';
+import { SkylineDivider } from '../backgrounds/SkylineDivider';
 import { HLynkKey } from './HLynkKey';
 import { HLynkScreen } from './HLynkScreen';
 import type { HLynkShellProps, HLynkStatus, ShellKeyProps } from './HLynkShell.types';
@@ -256,6 +257,13 @@ export function HLynkShell({
           <HLynkFallbackPanes force={forced} railRightPt={railRightPt} device={renderDevice} brand={renderBrand} testIDPrefix={testIDPrefix} />
         )}
       />
+      {/* Daylit: the skyline runs along the whole bottom edge, under the brand
+          pane and the device alike, from md (where the brand pane shows). */}
+      {scheme !== 'night' ? (
+        <View aria-hidden pointerEvents="none" className="hidden w-full md:flex" testID={id('skyline')}>
+          <SkylineDivider district="midtown" size="lg" still={reducedMotion} />
+        </View>
+      ) : null}
       <Announcer message={message} />
     </View>
   );

@@ -21,7 +21,7 @@ async function liveMetadataHandler(): Promise<MetadataHandler> {
   return metadataHandler;
 }
 
-/** `GET /.well-known/oauth-authorization-server`. */
+/** `GET` and preflight `OPTIONS` for `/.well-known/oauth-authorization-server`. */
 export async function handleAuthServerMetadata(request: Request): Promise<Response> {
   return (await liveMetadataHandler())(request);
 }

@@ -67,7 +67,7 @@ JS thread                                         render runtime ("nyc-mon-rende
 use-game-input: Caller sim (rAF, unchanged)
   -> callerStore / gameCameraStore
        -> worklet-host mirror(): packSnapshot  ---- Synchronizable<number[]> ---->  tick(): getDirty()
-          (21 numbers, version++)                                                    draw(): update, render, present
+          (22 numbers, version++)                                                    draw(): update, render, present
        -> if idle: one scheduleOnRuntime(wake)  ------------------------------->     parks after 2 quiet ticks
 ThreeCanvas (worklet mode): size, visibility,                                        idle.setBlocking(true)
   reduced motion -> session.resize/setRunning
@@ -76,7 +76,7 @@ gameScreenActions.loadStage / firstFrame  <---- scheduleOnRN('stage'|'firstFrame
 
 - **What moves.** Renderer init, scene build, `compileAsync`, every `update` (camera placement, tree LOD, Caller pose), `renderer.render` and `present()`. That is the 9 to 14 ms measured on the Duo.
 - **What stays on JS.** The Caller simulation and both stores, gestures, the HUD, Rive, the lobby. `character/` and `world/` are untouched and run on the runtime as they are: the Caller proxy is built with `createCallerProxyWith(mirror)`, where `mirror.getState()` returns the Caller read from the latest snapshot.
-- **Data flow.** Per input event the JS thread packs 21 numbers and writes one Synchronizable; no hop onto the render runtime. The runtime reads the latest snapshot once per tick. A hop happens only on the parked-to-drawing edge (`idle` flag, double-checked after parking so a write between the last read and parking is never lost), so a held stick costs one hop for the whole hold.
+- **Data flow.** Per input event the JS thread packs 22 numbers (camera, Caller, view, time-of-day preset) and writes one Synchronizable; no hop onto the render runtime. The runtime reads the latest snapshot once per tick. A hop happens only on the parked-to-drawing edge (`idle` flag, double-checked after parking so a write between the last read and parking is never lost), so a held stick costs one hop for the whole hold.
 - **On demand, as today.** The Game canvas stays `paused`: the loop runs while snapshots change or an actor reports motion, and parks otherwise. `invalidate()` from the canvas handle bumps the snapshot version.
 - **Milestones.** `withFirstFrameSignal` now takes a reporter (default `gameScreenActions.loadStage`, so the JS path is unchanged). On the runtime the reporter relays `worldBuilt` and `firstRender` with `scheduleOnRN`; `onFirstFrame` relays `firstFrame`. The compile-then-one-more-frame rule is the same code.
 - **Dispose.** Unmount disposes the session (stores unsubscribed on JS, scene and renderer disposed on the runtime). The runtime itself lives for the app's life, so three.js loads there once.
@@ -133,7 +133,7 @@ Read from github.com/margelo/react-native-runtimes on 2026-10-16: `packages/core
 1. **Fix the UI thread first.** 38 to 44 ms UI frames cap the screen near 25 fps on any rendering thread. The four autoPlay Rive views and layout work are the next measurement, not this.
 2. **Try worklets Bundle Mode on the Duo with the flag.** It is the only option the installed packages support end to end, it needs no native rebuild, and it is off in the default build. If the Bundle Mode build breaks unrelated worklets or Expo Router, drop it.
 3. **Defer react-native-runtimes.** STRIKE it for the render path until react-native-webgpu holds one manager per runtime (an upstream change) and #34 is fixed. It may suit headless work later (a world-tile parse, say), where no WebGPU view is involved.
-4. **Next best, if Bundle Mode fails on the device.** Keep three.js on JS and cut what the 9 to 14 ms is made of: render bundles for the static city, fewer per-frame `setFocus` rebuilds, frustum culling of the banded meshes. That is a smaller win and needs no new runtime.
+4. **Next best, if Bundle Mode fails on the device.** Keep three.js on JS and cut what the 9 to 14 ms is made of: fewer per-frame `setFocus` rebuilds, frustum culling of the banded meshes. (Render bundles for the static city were tried and deleted 2026-11 — r186 replay froze the camera transform.) That is a smaller win and needs no new runtime.
 
 ## Running both modes on the Duo
 

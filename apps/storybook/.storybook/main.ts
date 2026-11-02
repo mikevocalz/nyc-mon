@@ -66,12 +66,9 @@ const config: StorybookConfig = {
     '../../../packages/ui/primitives/*.stories.@(ts|tsx)',
     '../../../packages/ui/game-controls/**/*.stories.@(ts|tsx)',
     '../../../packages/ui/lobby/**/*.stories.@(ts|tsx)',
-    // packages/app has no stories yet, and Storybook warns on every pattern
-    // that matches nothing. Re-add this line when the first feature story
-    // lands (features live at packages/app/features/<name>/, so the glob
-    // needs the feature-name level — the old `app/*/components/*` pattern
-    // resolved to packages/app/features/components/ and never matched):
-    //   '../../../packages/app/features/*/**/*.stories.@(ts|tsx)',
+    // Feature stories live at packages/app/features/<name>/ (the first is
+    // settings/TimeOfDayRow), so the glob needs the feature-name level.
+    '../../../packages/app/features/*/**/*.stories.@(ts|tsx)',
   ],
   viteFinal: async (viteConfig) => {
     // TypeGPU's 'use gpu' functions are compiled to WGSL by unplugin-typegpu
@@ -164,6 +161,14 @@ const config: StorybookConfig = {
         'react-native-web',
       ],
     };
+    // Egg hatch GLBs (@acme/assets/eggs) load as URLs, the way Metro's
+    // assetExts hands native a numeric asset id. Without this Vite parses
+    // them as source and fails on the binary.
+    const existingAssets = viteConfig.assetsInclude;
+    viteConfig.assetsInclude = [
+      ...(Array.isArray(existingAssets) ? existingAssets : existingAssets ? [existingAssets] : []),
+      '**/*.glb',
+    ];
     viteConfig.server = { ...(viteConfig.server ?? {}), hmr: false };
     viteConfig.optimizeDeps = {
       ...(viteConfig.optimizeDeps ?? {}),

@@ -1,6 +1,7 @@
 // Triangles the GPU draws for a scene graph: per visible mesh, index count
 // (or vertex count) / 3, clipped by the geometry's draw range, times the
-// instance count for instanced meshes. The Surface Duo measurement
+// instance count for instanced meshes and for meshes over an
+// InstancedBufferGeometry (vd-instanced.ts). The Surface Duo measurement
 // (2026-10-16) used the same rule; the budget test pins it at the spawn.
 interface MeshLike {
   visible: boolean;
@@ -13,6 +14,7 @@ interface MeshLike {
     getAttribute(name: string): { count: number } | undefined;
     drawRange: { start: number; count: number };
     instanceCount?: number;
+    isInstancedBufferGeometry?: boolean;
   };
 }
 
@@ -27,7 +29,7 @@ export function visibleTriangles(root: MeshLike): { total: number; meshes: MeshT
       const elements = g.index ? g.index.count : (g.getAttribute('position')?.count ?? 0);
       const start = Math.max(0, g.drawRange.start);
       const count = Math.max(0, Math.min(elements - start, g.drawRange.count));
-      const instances = node.isInstancedMesh ? (node.count ?? 0) : 1;
+      const instances = node.isInstancedMesh ? (node.count ?? 0) : g.isInstancedBufferGeometry ? (g.instanceCount ?? 0) : 1;
       meshes.push({ name: node.name ?? '', triangles: Math.floor(count / 3) * instances });
     }
     for (const child of node.children) walk(child);

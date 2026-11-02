@@ -6,9 +6,11 @@ import {
   allSpecies,
   bloodlineLabel,
   bloodlines,
+  boroughEncounterProfiles,
   eggs,
   nextEvolutions,
   priorEvolutions,
+  rosterEntries,
   speciesIdForDex,
   starterBloodlines,
   walkChain,
@@ -43,12 +45,63 @@ function readRosterRegistry(): readonly RosterRow[] {
 const roster = readRosterRegistry();
 
 describe('roster v11.1 fixture', () => {
-  it('reads all 115 registry rows', () => {
+  it('reads all 115 registry rows, with unique Dex ids', () => {
     expect(roster).toHaveLength(115);
+    expect(new Set(roster.map((row) => row.dexId)).size).toBe(115);
+  });
+
+  it('ships exactly the 115 registered forms in the content package, without invented fields', () => {
+    expect(rosterEntries).toHaveLength(115);
+    expect(rosterEntries.map(({ dexId, bloodlineId, bloodlineName, formName, stage }) => ({
+      dexId, bloodlineId, bloodlineName,
+      formName: formName ?? '[OPEN] Rentgoose-family Egg',
+      stage: stage ?? 'Late-stage — v11 mapping open',
+    }))).toEqual(roster);
+  });
+
+  it("keeps F19's name and lifecycle decisions open, without inventing a sixth stage", () => {
+    expect(rosterEntries.find((row) => row.dexId === 110)?.formName).toBeNull();
+    expect(rosterEntries.find((row) => row.dexId === 114)?.stage).toBeNull();
+    expect(rosterEntries.filter((row) => row.bloodlineId === 'F19')).toHaveLength(6);
+    expect(bloodlines.some((line) => line.bloodlineId === 'F19')).toBe(false);
+    expect(allSpecies.some((species) => species.bloodlineId === 'F19')).toBe(false);
   });
 });
 
 describe('content integrity (§8)', () => {
+  it('publishes 18 complete Bloodlines and 109 runtime-safe forms without changing starters', () => {
+    expect(bloodlines).toHaveLength(18);
+    expect(allSpecies).toHaveLength(109);
+    expect(new Set(allSpecies.map((form) => form.bloodlineId)).size).toBe(18);
+  });
+
+  it('preserves v8 legacy types, size targets and lore without inventing Affinities or districts', () => {
+    for (const species of allSpecies) {
+      expect(species.legacyTypeNames, species.speciesId).not.toBeNull();
+      expect(species.scaleTargetDescription?.length, species.speciesId).toBeGreaterThan(0);
+      expect(species.loreSummary?.length, species.speciesId).toBeGreaterThan(0);
+      expect(species.affinityId).toBeNull();
+      expect(species.districtId).toBeNull();
+      expect(species.scaleMeters).toBeNull();
+    }
+  });
+
+  it('serves the starters from a standalone entry that matches the full roster', async () => {
+    const starters = await import('../mons/starters.ts');
+    const { inheritedDexDetails } = await import('../mons/inherited-v11-details.ts');
+    const { starterDexDetails } = await import('../mons/inherited-v11-starters.ts');
+    expect(starters.starterSpecies).toEqual(allSpecies.slice(0, 26));
+    // Object keys come back in numeric order; the starters are in slot order (F04 is slot 4 but #20-24).
+    expect(starters.starterSpecies.map((s) => s.dexId).sort((a, b) => (a ?? 0) - (b ?? 0))).toEqual(Object.keys(starterDexDetails).map(Number));
+    expect(Object.keys(inheritedDexDetails)).toHaveLength(109);
+  });
+
+  it('preserves borough-level encounter context without mapping it to home districts', () => {
+    expect(Object.keys(boroughEncounterProfiles)).toHaveLength(18);
+    expect(boroughEncounterProfiles.F12?.tierByBorough.Bronx).toBe('U');
+    expect(boroughEncounterProfiles.F12?.tierByBorough.Brooklyn).toBe('Q');
+  });
+
   it('every record parses through MonSpeciesDefSchema', () => {
     for (const species of allSpecies) {
       const result = MonSpeciesDefSchema.safeParse(species);
@@ -104,11 +157,12 @@ describe('content integrity (§8)', () => {
     }
   });
 
-  it('starters are F01, F02, F12 in slots 1-3 (DECISIONS.md #1)', () => {
+  it('starters are F01, F02, F12, F04 in slots 1-4 (DECISIONS.md #1, #38)', () => {
     expect(starterBloodlines.map((starter) => [starter.slot, starter.bloodline.bloodlineId])).toEqual([
       [1, 'F01'],
       [2, 'F02'],
       [3, 'F12'],
+      [4, 'F04'],
     ]);
   });
 
@@ -117,6 +171,7 @@ describe('content integrity (§8)', () => {
       'Hood Ratti Bloodline',
       'Bodega Baddiee Cee Bloodline',
       'Yote Bloodline',
+      'LanternFye Bloodline',
     ]);
   });
 });
@@ -127,6 +182,7 @@ describe('eggs', () => {
       { bloodlineId: 'F01', speciesId: 'dex-001', dexId: 1, eggName: 'Metro Egg', hatchesIntoSpeciesId: 'dex-002' },
       { bloodlineId: 'F02', speciesId: 'dex-008', dexId: 8, eggName: 'Corner Egg', hatchesIntoSpeciesId: 'dex-009' },
       { bloodlineId: 'F12', speciesId: 'dex-061', dexId: 61, eggName: 'Prism Egg', hatchesIntoSpeciesId: 'dex-062' },
+      { bloodlineId: 'F04', speciesId: 'dex-020', dexId: 20, eggName: 'Signal Egg', hatchesIntoSpeciesId: 'dex-021' },
     ]);
   });
 });
@@ -167,11 +223,14 @@ describe('bloodline evolution chains (DECISIONS.md #12)', () => {
     }
   });
 
-  it('every Mid has exactly three Max children and no Max has a child', () => {
+  it('every Mid branches to exactly its canon Max endpoints and no Max has a child', () => {
     for (const bloodline of bloodlines) {
       const nodes = walkChain(bloodline.chain);
       for (const mid of nodes.filter((node) => node.stage === 'Mid')) {
-        expect(mid.evolvesTo, mid.speciesId).toHaveLength(3);
+        const canonMaxIds = roster.filter(
+          (row) => row.bloodlineId === bloodline.bloodlineId && row.stage === 'Max',
+        ).map((row) => row.dexId);
+        expect(mid.evolvesTo.map((child) => child.dexId), mid.speciesId).toEqual(canonMaxIds);
         expect(mid.evolvesTo.every((child) => child.stage === 'Max')).toBe(true);
       }
       for (const max of nodes.filter((node) => node.stage === 'Max')) {
@@ -198,7 +257,22 @@ describe('bloodline evolution chains (DECISIONS.md #12)', () => {
     }
   });
 
-  it('no node has an authored evolution trigger in Phase 1 (Law 7)', () => {
+  it('has the documented legacy item/mastery prerequisites for all 37 v8 Max endpoints', () => {
+    expect(allSpecies.filter((species) => species.evolutionUnlock !== null).length).toBe(37);
+    const nineStarterFinals: Readonly<Record<number, string>> = {
+      5: 'Street Cred Crystal', 6: 'Aqua Crystal', 7: 'Phantom Crystal',
+      12: 'Bodega Heart Orb', 13: 'Knocker Orb', 14: 'Midnight Orb',
+      65: 'Fire Crystal', 66: 'Electric Crystal', 67: 'Aqua Crystal',
+    };
+    for (const [dexIdText, itemName] of Object.entries(nineStarterFinals)) {
+      const form = allSpecies.find((species) => species.dexId === Number(dexIdText));
+      expect(form?.stage).toBe('Max');
+      expect(form?.evolutionUnlock?.itemName).toBe(itemName);
+      expect(form?.evolutionUnlock?.mastery.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('no node has an executable EvolutionEvent in Phase 1 (Law 7)', () => {
     for (const bloodline of bloodlines) {
       for (const node of walkChain(bloodline.chain)) expect(node.evolutionDetails).toEqual([]);
     }

@@ -59,7 +59,7 @@ M10 and M08 now use `HLynkFit`; their scroll views are gone, including the one i
 ## Findings
 
 - At 640 pt wide, M10 does not fit below 360 pt of window height even at step 2 (compact chrome takes 96 pt, the content area is about 180 pt). Covered by a test that expects `fits: false`. Split-screen phones in landscape can be this short.
-- The `(onboarding)` and `(home)` route groups draw no navigation rail today, so `railRightPt` is 0 on every H-Lynk step. Whether those groups get the physical-right rail on foldables is a route-layout decision outside this lane (`apps/mobile/app`).
+- `(onboarding)` draws no navigation rail. Since 2026-10-27 `(home)` draws the `(tabs)` group's physical-right rail (`ShellRail`, `packages/app/features/navigation/ShellNav.tsx`) on native tablets, foldables and headsets, as a sibling of the stage host in `HomeLayout`. The host is measured narrower instead of being overlapped, so `railRightPt` is still 0 on every H-Lynk step.
 - The ui test mirrors the app's block builders because `@acme/ui` exports no `./hlynk/layout` subpath for node tests in `packages/app`. Adding `"./hlynk/layout": "./hlynk/layout.ts"` and `"./hlynk/content-fit": "./hlynk/content-fit.ts"` to `packages/ui/package.json` would let the app test import the real solver.
 - The fit's text heights are estimates (average glyph advance per em). `HLynkFit`'s measured pass corrects them on device; only a device run shows how often it needs to.
 

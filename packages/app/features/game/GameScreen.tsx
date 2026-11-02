@@ -27,12 +27,12 @@
 // beginning and ending). `useWorldSaveLifecycle` is mounted here, once, with
 // the Caller identity read the way the boot screen reads it (`readSave()`).
 import { useEffect, useMemo, useRef } from 'react';
-import { AccessibilityInfo, I18nManager, Platform, type LayoutChangeEvent, type HostInstance } from 'react-native';
+import { AccessibilityInfo, I18nManager, Platform, useWindowDimensions, type LayoutChangeEvent, type HostInstance } from 'react-native';
+import { EXPERIMENTAL_WORLD_PHYSICAL } from './world/physical-look.ts';
 import { GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStore } from 'zustand';
-import { IconButton, useInstanceStore, useReducedMotion } from '@acme/ui';
-import { ChevronLeft } from '@acme/ui/icons';
+import { BackButton, SafeArea, useInstanceStore, useReducedMotion } from '@acme/ui';
 import { useGpuSupport } from '@acme/ui/gpu';
 import { ThreeCanvas, type ThreeCanvasHandle } from '@acme/ui/three';
 import {
@@ -64,10 +64,22 @@ import { resolveGameViewState, shouldMountCanvas } from './game-status.ts';
 import { resolveGameHudLayout } from './hud-layout.ts';
 import { loadGameScene, type GameSceneParams } from './load-game-scene.ts';
 import { cinematicCameraStore } from './camera/cinematic-camera.store.ts';
+import { CITY_FRAME_SINK_ENABLED, onCityFrame } from './perf/on-city-frame.ts';
+import { GAME_SURFACE_TYPE } from './perf/surface-type.ts';
+import { GAME_FREERUN } from './perf/frame-pacing.ts';
+import { physicalRendererParams } from './world/physical-look.ts';
+import { onTimeOfDayChange, timeOfDayStore } from './world/time-of-day.store.ts';
+import { runJsDeviceProbe } from './render-runtime/run-js-device-probes.ts';
+
+// EXPO_PUBLIC_WORLD_PHYSICAL: reversed depth on the JS render path. Flag off: {}.
+const PHYSICAL_RENDERER_PARAMS = physicalRendererParams();
+import { budgetedPixelRatio } from './perf/pixel-budget.ts';
+import { useGamePerfMounts } from './perf/use-game-perf.ts';
 import { useGameRenderThread } from './render-thread-choice.ts';
 import { readLobbyIdentity } from './lobby/lobby-identity.ts';
 import { lobbyStore } from './lobby/lobby.store.ts';
 import { gameInputRouter, useGameInput } from './use-game-input.ts';
+import { livingCityActorFactories, livingCitySky } from './living-city/bundled-host.ts';
 import { useCityCameraGestures } from './use-city-camera-gestures.ts';
 import { useWorldSaveLifecycle } from './world-resume/use-world-save-lifecycle.ts';
 import type { SceneActorFactory } from './scene-actor.ts';
@@ -128,6 +140,7 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
   const { width, height, originX, originY } = useStore(geometry);
   const host = useRef<HostInstance>(null);
   const canvas = useRef<ThreeCanvasHandle>(null);
+  const windowSize = useWindowDimensions();
 
   const screen = useStore(gameScreenStore);
   const overMappedArea = useStore(gameCameraStore, (s) => (city.ok ? isOverMappedArea(s.camera, city.bounds) : true));
@@ -144,6 +157,10 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
     gameScreenActions.viewStateChanged(state);
   }, [state]);
   useEffect(() => () => gameScreenActions.viewStateChanged(null), []);
+  // EXPO_PUBLIC_WORLD_PROBE=shared|skiatex on the RN runtime; a no-op otherwise.
+  useEffect(() => {
+    void runJsDeviceProbe();
+  }, []);
   // Gameplay input and the controller exist only once the lobby has handed over (review finding H1):
   // under the cover, neither touch, hardware nor a screen reader reaches the world.
   const lobbyPhase = useStore(lobbyStore, (s) => s.phase);
@@ -155,6 +172,8 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
   useEffect(() => cinematicCameraStore.subscribe(() => canvas.current?.invalidate()), []);
   // The Caller moving (a jump in place moves no camera) -> one redraw, outside React render.
   useEffect(() => callerStore.subscribe(() => canvas.current?.invalidate()), []);
+  // A new time-of-day pick -> one redraw; city-scene re-lights from params.preset in that frame.
+  useEffect(() => onTimeOfDayChange(timeOfDayStore, () => canvas.current?.invalidate()), []);
 
   // Redraw once when the lobby hands over. The on-demand canvas drew its
   // first frame under the lobby cover, and on Android that frame does not
@@ -193,7 +212,15 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
       dataset: city.dataset,
       get camera() { return gameCameraStore.getState().camera; },
       get cinematicShot() { return cinematicCameraStore.getState().shot; },
-      actors: CALLER_ACTORS,
+      // PR05/PR06 Living City (EXPO_PUBLIC_LIVING_CITY=1, default off): the
+      // flag contributes the vehicle + pedestrian factories; off, the list is
+      // byte-identical.
+      actors: [...CALLER_ACTORS, ...livingCityActorFactories()],
+      // PR07: the world clock picks the sky preset (dusk at the slice's
+      // starting hour). Flag off → undefined → the world's own default.
+      sky: livingCitySky(),
+      // EXPO_PUBLIC_WORLD_PHYSICAL: the time-of-day pick; city-scene re-lights on change.
+      get preset() { return timeOfDayStore.getState().preset; },
       onFirstFrame: gameScreenActions.firstFrame,
     };
   }, [city]);
@@ -224,6 +251,10 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
   const identity = useMemo(() => readLobbyIdentity(), []);
   const dataset = city.ok ? city.dataset : null;
   useWorldSaveLifecycle({ identity, dataset });
+  // Flag-gated platform perf mounts: display-rate vote, thermal headroom
+  // monitor, ADPF hint session (performance-pass PR4.2 / PR5.1-2). Only while
+  // the Game tab is focused: the tab stays mounted when the player leaves it.
+  useGamePerfMounts(worldReady && focused);
   const input = useGameInput({
     enabled: gameplayInputEnabled(worldReady, lobbyPhase),
     focused,
@@ -271,6 +302,16 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
               ref={canvas}
               renderThread={renderThread.thread}
               workletHost={renderThread.host}
+              // Off by default; EXPO_PUBLIC_GAME_SURFACE=ahb presents through the
+              // AHB pool (mailbox semantics) instead of the TextureView queue.
+              androidSurfaceType={GAME_SURFACE_TYPE}
+              // Off by default; EXPO_PUBLIC_GAME_FREERUN=1 lets the on-demand
+              // loop outpace vsync — only meaningful on the superseding surface.
+              freeRun={GAME_FREERUN}
+              rendererParams={PHYSICAL_RENDERER_PARAMS}
+              // The physical city's targets were sized for an iPhone 17 buffer; a bigger
+              // screen gets a lower ratio rather than running out of memory.
+              maxPixelRatio={EXPERIMENTAL_WORLD_PHYSICAL ? budgetedPixelRatio(windowSize.width, windowSize.height, 2) : undefined}
               load={loadGameScene}
               params={params}
               paused
@@ -282,6 +323,7 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
               background={brand.night}
               // No accessibilityLabel: the canvas layer stays hidden; the wrapping View is the named, actionable element.
               onBackendChange={gameScreenActions.backendChanged}
+              onFrameTiming={CITY_FRAME_SINK_ENABLED ? onCityFrame : undefined}
             />
           </View>
         </GestureDetector>
@@ -315,27 +357,26 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
             onStart={input.startSession}
             onStopHoldStart={input.beginStopConfirm}
             onStopReleased={input.cancelStopConfirm}
+            onStopShortPress={input.shortPressFromStopConfirm}
           />
         ) : null}
-        {city.ok && shouldMountCanvas(state) ? <MapAttribution source={city.dataset.source} rect={hud.attribution} /> : null}
+        {city.ok && shouldMountCanvas(state) ? <MapAttribution source={city.dataset.sources[0]!} rect={hud.attribution} /> : null}
         {handedOver ? (
           // Leave the city: pause (the session saves on pause), then back to
           // the lobby, which offers "Continue your game". The rail is hidden
           // while the city is up, so this is the way out.
-          <View className="absolute" style={{ top: insets.top + 12, left: insets.left + 12 }}>
-            <IconButton
-              aria-label="Back to the lobby"
-              icon={<ChevronLeft />}
-              variant="cornerCut"
-              tone="orange"
-              corner="bottom-right"
-              size="lg"
-              onPress={() => {
-                gameInputRouter.pauseRequest('touch');
-                lobbyStore.getState().returnToLobby();
-              }}
-            />
-          </View>
+          // The kit BackButton in the same top-left spot as every other screen.
+          <SafeArea edges={['top', 'left']} pointerEvents="box-none" className="absolute left-0 top-0">
+            <View className="flex-row px-4 pt-4">
+              <BackButton
+                label="Back to the lobby"
+                onPress={() => {
+                  gameInputRouter.pauseRequest('touch');
+                  lobbyStore.getState().returnToLobby();
+                }}
+              />
+            </View>
+          </SafeArea>
         ) : null}
       </View>
     </View>

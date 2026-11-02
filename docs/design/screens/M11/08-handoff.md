@@ -6,7 +6,7 @@ Implementation contract for `platform`, `render` and the kit. Inputs: `01-resear
 
 | # | Blocker | Owner | Blocks |
 |---|---|---|---|
-| B1 | `CaptureCase` (NEW) with stories; art direction approved by Mike; Q4 (case = cradle) answered or accepted as the working assumption | kit + Mike | the case |
+| B1 | ~~`CaptureCase`~~ (superseded by Decision 29, 2026-10-21: M11 shows the egg) `CaptureCase` (NEW) with stories; art direction approved by Mike; Q4 (case = cradle) answered or accepted as the working assumption | kit + Mike | the case |
 | B2 | `IncubationRing` (NEW, Skia) with reduced sibling | kit / render | ring |
 | B3 | Trackpad `onHoldStart` / `onHoldEnd`; `haptics.warm` (`Presets.breath`); `useLedBreathPhase()` shared clock | kit | warm |
 | B4 | A selector for the pending egg. `selectStage` returns `undefined` before hatch, so "`stage: "Egg"`" can't be read from the Mon store. Add `selectPendingEgg(state): { egg: EggRecord; hatch: HatchState } \| undefined` to `create-mon-store.ts`, using the same rule as boot's private `unhatchedEggs` (earliest `incubationEndsAt`, ties by `eggId`). Export boot's helper from `@acme/core/sim` rather than copying it | sim-core + platform | the route |
@@ -19,8 +19,8 @@ Implementation contract for `platform`, `render` and the kit. Inputs: `01-resear
 | Priority | Intent |
 |---|---|
 | P1 | Say when the egg will be ready, in minutes and a clock time, and that a notification is coming |
-| P2 | Give one gentle thing to do: warm the case (no sim effect) |
-| P3 | When ready, put "Open the case" under the thumb |
+| P2 | Give one gentle thing to do: keep the egg warm (no sim effect) |
+| P3 | When ready, put "Hatch your egg" under the thumb |
 | P4 | Welcome a late return without blame |
 
 ## State derivation (pure, no writes)
@@ -63,7 +63,7 @@ M11 never writes the save. `tick` is evaluated, not persisted: `isEggReady` in b
 | Element | Component | testID |
 |---|---|---|
 | Shell | `HLynkShell testIDPrefix="m11"` | `m11-shell`, `m11-led`, `m11-trackpad`, `m11-key-home` … |
-| Case | `CaptureCase` | `m11-case` |
+| Egg | `View` (image role) with `EggStill`; replaces `CaptureCase` / `m11-case` (Decision 29, 2026-10-21) | `m11-egg` |
 | Ring | `IncubationRing` | `m11-ring` |
 | Time line | `Text` | `m11-time` |
 | Ready-at / overdue line | `Text` | `m11-time-detail` |
@@ -75,7 +75,7 @@ M11 never writes the save. `tick` is evaluated, not persisted: `isEggReady` in b
 
 | Input | counting | ready / overdue / resume |
 |---|---|---|
-| Trackpad hold | `onHoldStart`: pad glow follows `useLedBreathPhase()`; `haptics.warm()` on each inhale (≥ 4000 ms apart); announce once per 10 s. `onHoldEnd`: glow fades 200 ms | — |
+| Trackpad hold | `onHoldStart`: `haptics.warm()` on each inhale of `useLedBreathPhase()` (≥ 4000 ms apart); announce once per 10 s. `onHoldEnd`: pulses stop. (No pad glow since Decision 29.) | — |
 | Trackpad tap / `activate` | one breath of warm | `router.push({ pathname: '/(home)/hatch', params: { from: 'm11' } })` (M12 starts the show at once; see M12 handoff) |
 | Home key | disabled (this is home) | disabled |
 | Back | router back (never destructive) | same |
@@ -88,8 +88,8 @@ The warm calls nothing in `@acme/core` and writes nothing. That is the contract 
 |---|---|---|---|
 | LED | state | `motion-led-breath` 4000 ms 0.35→1 / `motion-led-blink-ready` | steady + `progress-ticks` / `filled-dot` |
 | Ring | frame clock | linear, UI thread (Reanimated `useFrameCallback` → Skia value) | one step per minute |
-| Pad glow | hold | `interpolate(breathPhase)` 0.25→1 | steady 1 while held |
-| Ready seam | ready edge | `motion-enter` 300 ms emphasized | instant |
+| Pad glow (removed, Decision 29) | hold | `interpolate(breathPhase)` 0.25→1 | steady 1 while held |
+| Ready seam (removed, Decision 29) | ready edge | `motion-enter` 300 ms emphasized | instant |
 | Shell scheme | clock crossing | `motion-scheme` 500 ms | instant |
 
 All of it runs on the UI thread from shared values; the JS thread re-renders only on the minute clock and state changes.

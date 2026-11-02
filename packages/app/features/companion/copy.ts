@@ -34,6 +34,11 @@ export const COMPANION_COPY = {
   'm13.resumed.a11y': '{name} is here. {status}.',
   'm13.choose.title': 'Which Mon is with you?',
   'm13.choose.body': 'You can switch any time from the Menu key.',
+  // Decision #18 chooser: the glass pages Mons with More; the menu entry; the spoken confirmation.
+  'm13.choose.more': 'More',
+  'm13.menu.switch': 'Switch Mon',
+  'm13.choose.done': '{name} is with you.',
+  'm13.choose.selected': 'with you now',
 
   // M14 Feed (screens/M14/05-copy.md). D-15e: no named foods, so the one
   // action is "Share a meal" (DECISIONS.md D-15e) until content/food exists.
@@ -102,6 +107,7 @@ export const COMPANION_COPY = {
 
   // M18 Journal (screens/M18/05-copy.md)
   'm18.title': 'Journal',
+  'm13.menu.settings': 'Settings',
   'm18.heading': '{name} and you',
   'm18.days.one': '1 day together',
   'm18.days.other': '{n} days together',
@@ -110,6 +116,9 @@ export const COMPANION_COPY = {
   'm18.cal.day.plain': '{date}',
   'm18.cal.prev': 'Previous month',
   'm18.cal.next': 'Next month',
+  // The timeline on the 3D H-Lynk's glass, a page at a time.
+  'm18.page.newer': 'Newer',
+  'm18.page.older': 'Older',
   'm18.day.today': 'Today',
   'm18.day.yesterday': 'Yesterday',
   'm18.entry.hatched': '{name} hatched',
@@ -123,6 +132,43 @@ export const COMPANION_COPY = {
   'm18.entry.woke': '{name} woke up rested',
   'm18.first': 'First',
   'm18.timeline.a11y': 'Journal entries',
+
+  // Companion pane beside or under the 3D H-Lynk on tablets and open foldables
+  // (docs/design/foldable-arrangements.md, "Companion pane on the persistent stage").
+  'pane.loading.a11y': 'Loading',
+  'pane.tips': 'Good to know',
+  'pane.home.title': 'Today with {name}',
+  'pane.home.care': 'How {name} is doing',
+  'pane.home.meter': '{meter}: {percent}%',
+  'pane.home.recent': 'Recent moments',
+  'pane.home.journal': 'Open Journal',
+  'pane.home.recent.empty.title': 'Nothing here yet',
+  'pane.home.recent.empty.body': 'Feed, rest or play with {name}. Each one shows up here.',
+  'pane.feed.title': 'Meals',
+  'pane.feed.history': 'Recent meals',
+  'pane.feed.empty.title': 'No meals yet',
+  'pane.feed.empty.body': 'Share a meal with {name}. It shows up here.',
+  'pane.feed.tip.full': 'Feeding {name} when Fullness is already high makes {name} slow for a while.',
+  'pane.feed.tip.asleep': '{name} does not eat while asleep.',
+  'pane.feed.tip.ask': 'When {name} asks for food, the trackpad shares a meal in one tap.',
+  'pane.rest.title': 'Sleep',
+  'pane.rest.history': 'Recent naps',
+  'pane.rest.empty.title': 'No naps yet',
+  'pane.rest.empty.body': 'Put {name} to bed. It shows up here.',
+  'pane.rest.tip.energy': 'Sleep brings Energy back.',
+  'pane.rest.tip.close': 'You can close the H-Lynk while {name} sleeps.',
+  'pane.rest.tip.early': 'Waking {name} early leaves {name} a little less social.',
+  'pane.social.title': 'Peek',
+  'pane.social.history': 'Recent games',
+  'pane.social.empty.title': 'No games yet',
+  'pane.social.empty.body': 'Play Peek with {name}. It shows up here.',
+  'pane.social.tip.how': '{name} hides in one of three spots. Flick to look, tap to peek.',
+  'pane.social.tip.tired': '{name} needs some Energy to play. When Energy runs low, rest comes first.',
+  'pane.social.tip.social': 'Each game raises Social.',
+  'pane.dex.title': 'About {name}',
+  'pane.journal.title': 'Calendar',
+  'pane.journal.all': 'Show every day',
+  'pane.journal.filtered': 'Showing {date}',
 } as const;
 
 export type CompanionCopyId = keyof typeof COMPANION_COPY;

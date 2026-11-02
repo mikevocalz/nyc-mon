@@ -117,7 +117,7 @@ export function ConfirmDestructive({
           onChangeText={(text) => store.setState({ typed: text })}
           surface="daylit"
         />
-        {st.error ? <ErrorMessage message={st.error} /> : null}
+        {st.error ? <ErrorMessage message={st.error} surface="page" /> : null}
       </View>
     </ResponsiveDialog>
   );

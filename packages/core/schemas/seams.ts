@@ -22,6 +22,13 @@ export const BattleClipIdSchema = z.enum(BATTLE_CLIP_IDS);
 export const SURFACE_KINDS = ['mobile', 'web', 'quest', 'pico', 'vision-pro', 'alexa'] as const;
 export const SurfaceKindSchema = z.enum(SURFACE_KINDS);
 
+/**
+ * Bible v11 ¶54: Mons have genders. One per individual, fixed at hatch. Copy
+ * still uses no pronouns for a Mon on any surface (PS-005).
+ */
+export const MON_GENDERS = ['female', 'male'] as const;
+export const MonGenderSchema = z.enum(MON_GENDERS);
+
 /** Voice maturity (Bible v11 §VoiceStudio). One `voiceLineageId` for life. */
 export const VoiceStageSchema = z.enum(['baby-talk', 'limited', 'full']);
 export const VoiceLineageSchema = z.object({

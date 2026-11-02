@@ -32,3 +32,28 @@ Stacked on the existing #46 world. Camera project: [pmndrs/klipp](https://github
 - Use Game Visual Debugging, React Best Practices, and game performance skill. No external subagent execution has been reported.
 
 **This phase does not claim an animated follow rig has run on hardware.** Draft, no merge/deploy.
+
+## Main integration repair, 2026-11-01
+
+Reconciled with main's floating origin, streaming, physical lighting and current
+settings/attribution contracts. Klipp's blended state stays in absolute world
+metres. Streaming, sky and focus consume that state; the scene writes the camera
+position relative to the render origin. This conversion always starts from
+`shots.shot.position`, not the camera's previous rendered position: Klipp 0.14.0
+skips unchanged transform writes, so repeated subtraction would otherwise drift.
+
+Regression coverage includes repeated stationary shots at a 49 km origin,
+rebasing while a shot is held, clearing back to chase, reduced-motion cuts,
+authored exponential-fog density and legacy linear fog. The sanitizer also keeps
+near strictly below far for out-of-range lens inputs. The workflow runs the scene
+tests in both current physical and legacy rendering configurations.
+
+Settled normalized view offsets are reapplied through Klipp's exported
+`writeCameraLens` when the viewport changes; `setSize` alone does not invalidate
+the unchanged lens in 0.14.0. A resize regression proves the offset scales with
+the new viewport rather than keeping the old pixel dimensions.
+
+Installed seam reviewed: `@pmndrs/klipp@0.14.0`'s
+`dist/three/KlippThree.js` and `dist/three/camera.js` (conditional transform/lens
+writes). These are CPU scene/contract tests, not GPU presentation, worklet shot
+support, collision validation or physical Surface Duo evidence.

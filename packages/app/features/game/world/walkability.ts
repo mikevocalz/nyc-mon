@@ -6,7 +6,8 @@
 //   blocked  everything else (back yards and unmapped lots inside blocks),
 //            and anywhere outside the tile
 // Ground is flat today: the tile carries no elevation, so height is 0.
-import type { CityDatasetV2, FlatPoints, RoadClass } from '../city-dataset.ts';
+import type { CityDatasetV3, FlatPoints, RoadClass } from '../city-dataset.ts';
+import { CURB_HEIGHT } from './curb.ts';
 import { pairs, pointInRing, segmentDistanceSq } from './geometry.ts';
 
 /** Roads the road mesh draws as sidewalk, not carriageway (city-mesh.ts). Everything else, crossings included, is carriageway. */
@@ -23,6 +24,9 @@ export interface WalkQueries {
 
 interface Polygon { ring: [number, number][]; holes: [number, number][][]; minX: number; maxX: number; minZ: number; maxZ: number }
 interface Segment { ax: number; az: number; bx: number; bz: number; reach: number }
+
+/** Padding added to each path buffer so buffered centrelines that nearly touch still join. */
+const PATH_SEAM_PAD = 0.15;
 
 function polygon(ring: FlatPoints, holes: readonly FlatPoints[]): Polygon {
   const points = pairs(ring);
@@ -57,7 +61,7 @@ class Grid<T> {
   }
 }
 
-export function createWalkQueries(dataset: CityDatasetV2): WalkQueries {
+export function createWalkQueries(dataset: CityDatasetV3): WalkQueries {
   const buildings = new Grid<Polygon>();
   const water = new Grid<Polygon>();
   const open = new Grid<Polygon>();
@@ -78,7 +82,12 @@ export function createWalkQueries(dataset: CityDatasetV2): WalkQueries {
     (a.kind === 'water' ? water : open).add(p, p.minX, p.minZ, p.maxX, p.maxZ);
   }
   for (const r of dataset.roads) {
-    const reach = r.widthMeters / 2 + r.sidewalkMeters;
+    // Buffered centrelines must touch where they meet: two neighbouring ways
+    // (sidewalk to sidewalk, sidewalk to street) can stop a few centimetres
+    // short of each other, and an unpadded union leaves an unwalkable slit
+    // the Caller can slide into but never out of. The v3 tile carries such a
+    // seam beside the corner of osm:way:271805697 at (-345.9, 130.2).
+    const reach = r.widthMeters / 2 + r.sidewalkMeters + PATH_SEAM_PAD;
     for (let i = 2; i < r.points.length; i += 2) {
       const s = { ax: r.points[i - 2]!, az: r.points[i - 1]!, bx: r.points[i]!, bz: r.points[i + 1]!, reach };
       minX = Math.min(minX, s.ax, s.bx); maxX = Math.max(maxX, s.ax, s.bx);
@@ -99,7 +108,12 @@ export function createWalkQueries(dataset: CityDatasetV2): WalkQueries {
     for (const a of open.at(x, z)) if (contains(a, x, z)) return true;
     return false;
   };
-  const groundHeight = (x: number, z: number): number => (Number.isFinite(x) && Number.isFinite(z) ? 0 : Number.NaN);
+  // Raised sidewalks (vd lane): curb height everywhere off the carriageway, road level on it.
+  const kerb = CURB_HEIGHT > 0 ? createStreetClearance(dataset) : null;
+  const groundHeight = (x: number, z: number): number => {
+    if (!Number.isFinite(x) || !Number.isFinite(z)) return Number.NaN;
+    return kerb && !kerb.inCarriageway(x, z, 0) ? CURB_HEIGHT : 0;
+  };
   return { isWalkable, groundHeight };
 }
 
@@ -122,6 +136,9 @@ export const BAND_OUTER_GAP = 0.3;
 export const ASSUMED_SIDEWALK = 3;
 /** How far past a carriageway the clearance grid looks (crown overhang queries reach this far). */
 const LOOK = 6;
+/** inBuilding's four rim directions: +x, -x, +z, -z. */
+const RIM_UNIT_X = [1, -1, 0, 0] as const;
+const RIM_UNIT_Z = [0, 0, 1, -1] as const;
 
 interface Carriageway { ax: number; az: number; bx: number; bz: number; half: number; sidewalk: number; id: string; crossing: boolean }
 
@@ -153,7 +170,7 @@ export interface StreetClearance {
 
 export interface NearestRoad { gap: number; dir: [number, number]; away: [number, number]; id: string; half: number }
 
-export function createStreetClearance(dataset: CityDatasetV2): StreetClearance {
+export function createStreetClearance(dataset: CityDatasetV3): StreetClearance {
   const roads = new Grid<Carriageway>();
   const buildings = new Grid<Polygon>();
   for (const b of dataset.buildings) {
@@ -182,9 +199,11 @@ export function createStreetClearance(dataset: CityDatasetV2): StreetClearance {
   const inBuilding = (x: number, z: number, pad = 0.2) => {
     for (const b of buildings.at(x, z)) if (contains(b, x, z, pad)) return true;
     // `contains` takes the pad on the bounding box only; test the rim too.
+    // Unit offsets scaled by pad: no array literals per call (the physical city build calls this for every placement probe).
     if (pad > 0) {
-      for (const [ox, oz] of [[pad, 0], [-pad, 0], [0, pad], [0, -pad]] as const) {
-        for (const b of buildings.at(x + ox, z + oz)) if (contains(b, x + ox, z + oz)) return true;
+      for (let k = 0; k < 4; k++) {
+        const px = x + RIM_UNIT_X[k]! * pad; const pz = z + RIM_UNIT_Z[k]! * pad;
+        for (const b of buildings.at(px, pz)) if (contains(b, px, pz)) return true;
       }
     }
     return false;

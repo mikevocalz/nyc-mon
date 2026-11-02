@@ -13,7 +13,10 @@ loadProjectEnv(join(appDir, '../..'), { silent: true, force: true });
 const config: ExpoConfig & { newArchEnabled: true } = {
   name: 'NYC-MON',
   slug: 'nyc-mon',
-  scheme: 'nycmon',
+  // `nycmon` stays first: expo-linking builds the app's own URLs from it.
+  // `com.nycmon.app` is the Google OAuth redirect scheme (M03,
+  // packages/app/features/onboarding/social-sign-in.native.ts).
+  scheme: ['nycmon', 'com.nycmon.app'],
   version: '0.1.0',
   orientation: 'default',
   icon: './assets/images/icon.png',
@@ -24,6 +27,8 @@ const config: ExpoConfig & { newArchEnabled: true } = {
   ios: {
     bundleIdentifier: 'com.nycmon.app',
     supportsTablet: true,
+    // Sign in with Apple entitlement (M03). The App ID needs the capability too.
+    usesAppleSignIn: true,
     infoPlist: {
       // Profiles the app handles. Every supported pad (Xbox, DualShock 4, DualSense,
       // Switch Pro, Joy-Con pair, MFi) presents ExtendedGamepad; DirectionalGamepad
@@ -32,6 +37,10 @@ const config: ExpoConfig & { newArchEnabled: true } = {
       // false: the pad drives gameplay, not UIKit focus. true would let Start/A move and
       // activate focus in the React Native view tree.
       GCSupportsControllerUserInteraction: false,
+      // ProMotion: without this key Core Animation clamps the app's frame
+      // interval at 1/60 s, so CADisplayLink-driven content can never reach
+      // 120 Hz on ProMotion iPhones. The system still picks the actual rate.
+      CADisableMinimumFrameDurationOnPhone: true,
     },
   },
   android: {
@@ -50,6 +59,8 @@ const config: ExpoConfig & { newArchEnabled: true } = {
     // First in the list so it runs after expo-horizon-core, whose manifest
     // plugin rebuilds `uses-feature` (docs/implementation/hardware-input.md §5).
     './plugins/with-optional-gamepad',
+    // Keeps rnskia_getWGPUInstance linked on iOS so react-native-webgpu can share Skia's device (ADR 0026).
+    './plugins/with-skia-wgpu-instance',
     'expo-router',
     // Quest and PICO run Android 12+; Skia v3 (Graphite) needs 26+, and Meta's
     // layout library and react-native-webgpu's AHardwareBuffer use need 29.
@@ -75,6 +86,8 @@ const config: ExpoConfig & { newArchEnabled: true } = {
       },
     ],
     'expo-image',
+    'expo-apple-authentication',
+    'expo-web-browser',
     [
       'expo-calendar',
       {

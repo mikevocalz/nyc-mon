@@ -51,6 +51,18 @@ describe('play session state machine (§2C, §14 "no new session created by paus
     expect(fromPaused).toEqual(paused);
   });
 
+  it('a touch-down opens stop-confirm, so a short press arrives as cancelStop then pillPress (StartStopPill onShortPress)', () => {
+    // The pill dispatches stopConfirm on touch-down; a release inside the tap
+    // window must cancel the confirm AND deliver the pause/resume the tap was
+    // for — else the session latches in stop-confirm (the frozen-world bug).
+    const playing = run([start]).state;
+    const pressedWhilePlaying = run([{ type: 'stopConfirm', at: T0 + 1 }, { type: 'cancelStop', at: T0 + 2 }, { type: 'pillPress', at: T0 + 3 }], playing).state;
+    expect(pressedWhilePlaying).toEqual({ kind: 'paused', sessionId: 'session-1', startedAt: T0, pausedAt: T0 + 3, cause: 'pill' });
+    const paused = run([start, { type: 'pillPress', at: T0 + 1 }]).state;
+    const pressedWhilePaused = run([{ type: 'stopConfirm', at: T0 + 2 }, { type: 'cancelStop', at: T0 + 3 }, { type: 'pillPress', at: T0 + 4 }], paused).state;
+    expect(pressedWhilePaused).toEqual(playing);
+  });
+
   it('background pauses from playing and from stop-confirm with a save, and is ignored elsewhere', () => {
     const playing = run([start]).state;
     const bg = transitionSession(playing, { type: 'background', at: T0 + 1 });

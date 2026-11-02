@@ -17,6 +17,7 @@
     "test": "node --test '**/*.test.ts'"
   },
   "dependencies": {
+    "zod": "catalog:",
     "@acme/assets": "workspace:*",
     "@acme/auth": "workspace:*",
     "@acme/content": "workspace:*",
@@ -26,15 +27,20 @@
     "@pmndrs/klipp": "0.14.0",
     "@tanstack/react-query": "catalog:",
     "date-fns": "catalog:",
-    "expo-audio": "catalog:",
+    "expo-apple-authentication": "catalog:",
+    "expo-auth-session": "catalog:",
+    "expo-crypto": "catalog:",
     "expo-calendar": "catalog:",
     "expo-document-picker": "catalog:",
     "expo-file-system": "catalog:",
     "expo-image-picker": "catalog:",
+    "expo-audio": "catalog:",
     "expo-location": "catalog:",
+    "expo-network": "catalog:",
+    "expo-sensors": "catalog:",
     "expo-notifications": "catalog:",
     "expo-router": "catalog:",
-    "expo-sensors": "catalog:",
+    "expo-web-browser": "catalog:",
     "lucide-react": "catalog:",
     "lucide-react-native": "catalog:",
     "react-native-audio-api": "catalog:",
@@ -48,7 +54,6 @@
     "react-native-worklets": "catalog:",
     "react-native-youtube-bridge": "catalog:",
     "solito": "catalog:",
-    "zod": "catalog:",
     "zustand": "catalog:"
   },
   "devDependencies": {
@@ -56,13 +61,13 @@
     "@expo/dom-webview": "catalog:",
     "@react-native/metro-config": "catalog:",
     "@types/react": "catalog:",
-    "@types/three": "catalog:",
     "eslint": "catalog:",
     "eslint-config-expo": "catalog:",
     "react": "catalog:",
     "react-native": "catalog:",
+    "typescript": "catalog:",
     "three": "catalog:",
-    "typescript": "catalog:"
+    "@types/three": "catalog:"
   },
   "peerDependencies": {
     "react": "*",

@@ -5,6 +5,7 @@
 // compiled as their TSL albedo and emissive graphs on a basic material
 // (materials.albedoGraphs); and textured materials (lettering, leaves) need
 // a GPU backend for sampling, so they are skipped. Scene fog is not included.
+import '../classic-flags.test-support.ts';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -23,6 +24,9 @@ test('every city material graph compiles to WGSL, quickly and at a sane size', a
   const canvas = { width: 300, height: 150, style: {}, addEventListener() {}, removeEventListener() {}, getContext: () => null } as unknown as HTMLCanvasElement;
   const renderer = new THREE.WebGPURenderer({ canvas });
   await renderer.init().catch(() => undefined);
+  // CPU-only WGSL builds have no runtime binding cache. r187 treats only
+  // undefined (not the failed-init null) as absent; keep its real compiler.
+  Reflect.set(renderer, '_bindings', undefined);
   // The two backend capabilities the builder asks for; node has no GPU.
   (renderer as unknown as { backend: { capabilities: unknown } }).backend.capabilities = { getUniformBufferLimit: () => 65_536 };
   (renderer as unknown as { hasFeature: () => boolean }).hasFeature = () => false;
@@ -37,7 +41,6 @@ test('every city material graph compiles to WGSL, quickly and at a sane size', a
     b.build();
     return { ms: performance.now() - started, size: b.fragmentShader?.length ?? 0 };
   };
-  const materials = createCityMaterials(THREE as never, SUN);
   let compiled = 0;
   const seen = new Set<string>();
   built.scene.traverse((object) => {
@@ -54,17 +57,24 @@ test('every city material graph compiles to WGSL, quickly and at a sane size', a
       assert.match(String((error as Error).message), /Resolution of the following tree failed/, `${mesh.name}: ${String((error as Error).message).slice(0, 300)}`);
     }
   });
-  for (const [material, albedo] of materials.albedoGraphs) {
-    const stand = new THREE.MeshBasicNodeMaterial();
-    stand.colorNode = THREE.TSL.vec4(albedo as never, 1);
-    (stand as unknown as { emissiveNode: unknown }).emissiveNode = (material as unknown as { emissiveNode?: unknown }).emissiveNode ?? null;
-    const name = Object.entries(materials).find(([, v]) => v === material)?.[0] ?? '?';
-    const holder = built.scene.getObjectByName(name === 'cars' ? 'city:cars' : name === 'trunks' ? 'city:tree-trunks' : 'city:walls-masonry')!;
-    const { ms, size } = compile(holder, stand);
-    assert.ok(ms < 200 && size > 400 && size < 20_000, `${name}: ${ms.toFixed(1)} ms, ${size} chars`);
-    compiled++;
+  // The surface-detail flag is read from the env once at module load, so the
+  // scene above carries whichever variant the env selected. Build the graphs
+  // for BOTH flag states explicitly, so the flag-on mortar and asphalt nodes
+  // are compiled here instead of being assumed error-free.
+  for (const surfaceDetail of [false, true]) {
+    const materials = createCityMaterials(THREE as never, SUN, { surfaceDetail });
+    for (const [material, albedo] of materials.albedoGraphs) {
+      const stand = new THREE.MeshBasicNodeMaterial();
+      stand.colorNode = THREE.TSL.vec4(albedo as never, 1);
+      (stand as unknown as { emissiveNode: unknown }).emissiveNode = (material as unknown as { emissiveNode?: unknown }).emissiveNode ?? null;
+      const name = Object.entries(materials).find(([, v]) => v === material)?.[0] ?? '?';
+      const holder = built.scene.getObjectByName(name === 'cars' ? 'city:cars' : name === 'trunks' ? 'city:tree-trunks' : 'city:walls-masonry')!;
+      const { ms, size } = compile(holder, stand);
+      assert.ok(ms < 200 && size > 400 && size < 20_000, `${name} surfaceDetail=${surfaceDetail}: ${ms.toFixed(1)} ms, ${size} chars`);
+      compiled++;
+    }
+    materials.dispose();
   }
   assert.ok(compiled >= 19, `${compiled} graphs compiled`);
-  materials.dispose();
   built.dispose!();
 });

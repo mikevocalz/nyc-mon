@@ -45,8 +45,38 @@ function migrateV1ToV2(blob: Record<string, unknown>): Record<string, unknown> {
   return { ...blob, queue: nextQueue, journal };
 }
 
+/**
+ * v2 phase label → v3 phase label (Decision 29). The capture case is not part
+ * of hatching, so its two beats become the egg's own: `case-open` → `stir`,
+ * `scanner` → `pressure`. Labels absent here carry over unchanged.
+ */
+const HATCH_PHASE_V2_TO_V3: Readonly<Record<string, string>> = { 'case-open': 'stir', scanner: 'pressure' };
+
+/**
+ * v2 → v3. Renames a presenting hatch's legacy phase label and changes
+ * nothing else: the same `eggId`, the same Mon (so the same reserved
+ * `monInstanceId`), the same `serverConfirmed`. A resumed hatch starts at the
+ * beginning of the migrated phase, as it would have at the old one. No Mon is
+ * added. Malformed input passes through untouched so validation reports it.
+ */
+function migrateV2ToV3(blob: Record<string, unknown>): Record<string, unknown> {
+  const hatches = blob['hatches'];
+  if (!Array.isArray(hatches)) return blob;
+  return {
+    ...blob,
+    hatches: hatches.map((h: unknown) => {
+      if (!isRecord(h) || h['kind'] !== 'presenting' || typeof h['phase'] !== 'string') return h;
+      const phase = HATCH_PHASE_V2_TO_V3[h['phase']];
+      return phase === undefined ? h : { ...h, phase };
+    }),
+  };
+}
+
 /** The migration table: one step per version. CURRENT_SAVE_VERSION is the last step's target. */
-export const SAVE_MIGRATIONS: readonly SaveMigration[] = [{ from: 1, migrate: migrateV1ToV2 }];
+export const SAVE_MIGRATIONS: readonly SaveMigration[] = [
+  { from: 1, migrate: migrateV1ToV2 },
+  { from: 2, migrate: migrateV2ToV3 },
+];
 
 export type SaveLoadFailure = 'corrupt' | 'future-version' | 'missing-migration' | 'invalid';
 

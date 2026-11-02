@@ -17,6 +17,8 @@
  * guarded; the first failure is reported once and then silently ignored.
  */
 
+import { hapticsEnabled } from './device-preferences.ts';
+
 type HapticFn = () => void;
 
 let presets: typeof import('react-native-pulsar').Presets | null | undefined;
@@ -43,6 +45,8 @@ function loadPresets() {
 const guard =
   (select: (p: NonNullable<typeof presets>) => HapticFn): HapticFn =>
   () => {
+    // The Caller's Haptics switch (Settings, M19): off means every call is a no-op.
+    if (!hapticsEnabled()) return;
     const loaded = loadPresets();
     if (!loaded) return;
     try {

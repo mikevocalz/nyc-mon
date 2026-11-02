@@ -18,13 +18,18 @@ import { Route as OauthRefusedRouteImport } from './routes/oauth/refused'
 import { Route as OauthSignInRouteImport } from './routes/oauth/sign-in'
 import { Route as V1EggsRouteImport } from './routes/v1/eggs'
 import { Route as V1GuardianConsentsRouteImport } from './routes/v1/guardian-consents'
+import { Route as V1MonLingoRouteImport } from './routes/v1/mon-lingo'
+import { Route as V1MonVoiceRouteImport } from './routes/v1/mon-voice'
 import { Route as V1WaitlistRouteImport } from './routes/v1/waitlist'
 import { Route as PayloadAdminIndexRouteImport } from './routes/_payload/admin.index'
 import { Route as PayloadAdminSplatRouteImport } from './routes/_payload/admin.$'
 import { Route as PayloadPayloadApiSplatRouteImport } from './routes/_payload/payload-api.$'
+import { Route as V1MeCompanionMemoryRouteImport } from './routes/v1/me/companion-memory'
 import { Route as V1MeEggsRouteImport } from './routes/v1/me/eggs'
 import { Route as V1MeMonsRouteImport } from './routes/v1/me/mons'
+import { Route as V1MonsAdoptRouteImport } from './routes/v1/mons/adopt'
 import { Route as V1EggsIdHatchRouteImport } from './routes/v1/eggs/$id/hatch'
+import { Route as V1MonModelsGlbSpeciesRouteImport } from './routes/v1/mon-models/glb/$species'
 import { Route as V1MonsIdCareRouteImport } from './routes/v1/mons/$id/care'
 
 const IndexRoute = IndexRouteImport.update({
@@ -72,6 +77,16 @@ const V1GuardianConsentsRoute = V1GuardianConsentsRouteImport.update({
   path: '/v1/guardian-consents',
   getParentRoute: () => rootRouteImport,
 } as any)
+const V1MonLingoRoute = V1MonLingoRouteImport.update({
+  id: '/v1/mon-lingo',
+  path: '/v1/mon-lingo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const V1MonVoiceRoute = V1MonVoiceRouteImport.update({
+  id: '/v1/mon-voice',
+  path: '/v1/mon-voice',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const V1WaitlistRoute = V1WaitlistRouteImport.update({
   id: '/v1/waitlist',
   path: '/v1/waitlist',
@@ -92,6 +107,11 @@ const PayloadPayloadApiSplatRoute = PayloadPayloadApiSplatRouteImport.update({
   path: '/payload-api/$',
   getParentRoute: () => PayloadRoute,
 } as any)
+const V1MeCompanionMemoryRoute = V1MeCompanionMemoryRouteImport.update({
+  id: '/v1/me/companion-memory',
+  path: '/v1/me/companion-memory',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const V1MeEggsRoute = V1MeEggsRouteImport.update({
   id: '/v1/me/eggs',
   path: '/v1/me/eggs',
@@ -102,10 +122,20 @@ const V1MeMonsRoute = V1MeMonsRouteImport.update({
   path: '/v1/me/mons',
   getParentRoute: () => rootRouteImport,
 } as any)
+const V1MonsAdoptRoute = V1MonsAdoptRouteImport.update({
+  id: '/v1/mons/adopt',
+  path: '/v1/mons/adopt',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const V1EggsIdHatchRoute = V1EggsIdHatchRouteImport.update({
   id: '/$id/hatch',
   path: '/$id/hatch',
   getParentRoute: () => V1EggsRoute,
+} as any)
+const V1MonModelsGlbSpeciesRoute = V1MonModelsGlbSpeciesRouteImport.update({
+  id: '/v1/mon-models/glb/$species',
+  path: '/v1/mon-models/glb/$species',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const V1MonsIdCareRoute = V1MonsIdCareRouteImport.update({
   id: '/v1/mons/$id/care',
@@ -122,13 +152,18 @@ export interface FileRoutesByFullPath {
   '/oauth/sign-in': typeof OauthSignInRoute
   '/v1/eggs': typeof V1EggsRouteWithChildren
   '/v1/guardian-consents': typeof V1GuardianConsentsRoute
+  '/v1/mon-lingo': typeof V1MonLingoRoute
+  '/v1/mon-voice': typeof V1MonVoiceRoute
   '/v1/waitlist': typeof V1WaitlistRoute
   '/admin/$': typeof PayloadAdminSplatRoute
   '/payload-api/$': typeof PayloadPayloadApiSplatRoute
+  '/v1/me/companion-memory': typeof V1MeCompanionMemoryRoute
   '/v1/me/eggs': typeof V1MeEggsRoute
   '/v1/me/mons': typeof V1MeMonsRoute
+  '/v1/mons/adopt': typeof V1MonsAdoptRoute
   '/admin/': typeof PayloadAdminIndexRoute
   '/v1/eggs/$id/hatch': typeof V1EggsIdHatchRoute
+  '/v1/mon-models/glb/$species': typeof V1MonModelsGlbSpeciesRoute
   '/v1/mons/$id/care': typeof V1MonsIdCareRoute
 }
 export interface FileRoutesByTo {
@@ -140,13 +175,18 @@ export interface FileRoutesByTo {
   '/oauth/sign-in': typeof OauthSignInRoute
   '/v1/eggs': typeof V1EggsRouteWithChildren
   '/v1/guardian-consents': typeof V1GuardianConsentsRoute
+  '/v1/mon-lingo': typeof V1MonLingoRoute
+  '/v1/mon-voice': typeof V1MonVoiceRoute
   '/v1/waitlist': typeof V1WaitlistRoute
   '/admin/$': typeof PayloadAdminSplatRoute
   '/payload-api/$': typeof PayloadPayloadApiSplatRoute
+  '/v1/me/companion-memory': typeof V1MeCompanionMemoryRoute
   '/v1/me/eggs': typeof V1MeEggsRoute
   '/v1/me/mons': typeof V1MeMonsRoute
+  '/v1/mons/adopt': typeof V1MonsAdoptRoute
   '/admin': typeof PayloadAdminIndexRoute
   '/v1/eggs/$id/hatch': typeof V1EggsIdHatchRoute
+  '/v1/mon-models/glb/$species': typeof V1MonModelsGlbSpeciesRoute
   '/v1/mons/$id/care': typeof V1MonsIdCareRoute
 }
 export interface FileRoutesById {
@@ -160,13 +200,18 @@ export interface FileRoutesById {
   '/oauth/sign-in': typeof OauthSignInRoute
   '/v1/eggs': typeof V1EggsRouteWithChildren
   '/v1/guardian-consents': typeof V1GuardianConsentsRoute
+  '/v1/mon-lingo': typeof V1MonLingoRoute
+  '/v1/mon-voice': typeof V1MonVoiceRoute
   '/v1/waitlist': typeof V1WaitlistRoute
   '/_payload/admin/$': typeof PayloadAdminSplatRoute
   '/_payload/payload-api/$': typeof PayloadPayloadApiSplatRoute
+  '/v1/me/companion-memory': typeof V1MeCompanionMemoryRoute
   '/v1/me/eggs': typeof V1MeEggsRoute
   '/v1/me/mons': typeof V1MeMonsRoute
+  '/v1/mons/adopt': typeof V1MonsAdoptRoute
   '/_payload/admin/': typeof PayloadAdminIndexRoute
   '/v1/eggs/$id/hatch': typeof V1EggsIdHatchRoute
+  '/v1/mon-models/glb/$species': typeof V1MonModelsGlbSpeciesRoute
   '/v1/mons/$id/care': typeof V1MonsIdCareRoute
 }
 export interface FileRouteTypes {
@@ -180,13 +225,18 @@ export interface FileRouteTypes {
     | '/oauth/sign-in'
     | '/v1/eggs'
     | '/v1/guardian-consents'
+    | '/v1/mon-lingo'
+    | '/v1/mon-voice'
     | '/v1/waitlist'
     | '/admin/$'
     | '/payload-api/$'
+    | '/v1/me/companion-memory'
     | '/v1/me/eggs'
     | '/v1/me/mons'
+    | '/v1/mons/adopt'
     | '/admin/'
     | '/v1/eggs/$id/hatch'
+    | '/v1/mon-models/glb/$species'
     | '/v1/mons/$id/care'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -198,13 +248,18 @@ export interface FileRouteTypes {
     | '/oauth/sign-in'
     | '/v1/eggs'
     | '/v1/guardian-consents'
+    | '/v1/mon-lingo'
+    | '/v1/mon-voice'
     | '/v1/waitlist'
     | '/admin/$'
     | '/payload-api/$'
+    | '/v1/me/companion-memory'
     | '/v1/me/eggs'
     | '/v1/me/mons'
+    | '/v1/mons/adopt'
     | '/admin'
     | '/v1/eggs/$id/hatch'
+    | '/v1/mon-models/glb/$species'
     | '/v1/mons/$id/care'
   id:
     | '__root__'
@@ -217,13 +272,18 @@ export interface FileRouteTypes {
     | '/oauth/sign-in'
     | '/v1/eggs'
     | '/v1/guardian-consents'
+    | '/v1/mon-lingo'
+    | '/v1/mon-voice'
     | '/v1/waitlist'
     | '/_payload/admin/$'
     | '/_payload/payload-api/$'
+    | '/v1/me/companion-memory'
     | '/v1/me/eggs'
     | '/v1/me/mons'
+    | '/v1/mons/adopt'
     | '/_payload/admin/'
     | '/v1/eggs/$id/hatch'
+    | '/v1/mon-models/glb/$species'
     | '/v1/mons/$id/care'
   fileRoutesById: FileRoutesById
 }
@@ -237,9 +297,14 @@ export interface RootRouteChildren {
   OauthSignInRoute: typeof OauthSignInRoute
   V1EggsRoute: typeof V1EggsRouteWithChildren
   V1GuardianConsentsRoute: typeof V1GuardianConsentsRoute
+  V1MonLingoRoute: typeof V1MonLingoRoute
+  V1MonVoiceRoute: typeof V1MonVoiceRoute
   V1WaitlistRoute: typeof V1WaitlistRoute
+  V1MeCompanionMemoryRoute: typeof V1MeCompanionMemoryRoute
   V1MeEggsRoute: typeof V1MeEggsRoute
   V1MeMonsRoute: typeof V1MeMonsRoute
+  V1MonsAdoptRoute: typeof V1MonsAdoptRoute
+  V1MonModelsGlbSpeciesRoute: typeof V1MonModelsGlbSpeciesRoute
   V1MonsIdCareRoute: typeof V1MonsIdCareRoute
 }
 
@@ -308,6 +373,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof V1GuardianConsentsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/v1/mon-lingo': {
+      id: '/v1/mon-lingo'
+      path: '/v1/mon-lingo'
+      fullPath: '/v1/mon-lingo'
+      preLoaderRoute: typeof V1MonLingoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v1/mon-voice': {
+      id: '/v1/mon-voice'
+      path: '/v1/mon-voice'
+      fullPath: '/v1/mon-voice'
+      preLoaderRoute: typeof V1MonVoiceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v1/waitlist': {
       id: '/v1/waitlist'
       path: '/v1/waitlist'
@@ -336,6 +415,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PayloadPayloadApiSplatRouteImport
       parentRoute: typeof PayloadRoute
     }
+    '/v1/me/companion-memory': {
+      id: '/v1/me/companion-memory'
+      path: '/v1/me/companion-memory'
+      fullPath: '/v1/me/companion-memory'
+      preLoaderRoute: typeof V1MeCompanionMemoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v1/me/eggs': {
       id: '/v1/me/eggs'
       path: '/v1/me/eggs'
@@ -350,12 +436,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof V1MeMonsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/v1/mons/adopt': {
+      id: '/v1/mons/adopt'
+      path: '/v1/mons/adopt'
+      fullPath: '/v1/mons/adopt'
+      preLoaderRoute: typeof V1MonsAdoptRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v1/eggs/$id/hatch': {
       id: '/v1/eggs/$id/hatch'
       path: '/$id/hatch'
       fullPath: '/v1/eggs/$id/hatch'
       preLoaderRoute: typeof V1EggsIdHatchRouteImport
       parentRoute: typeof V1EggsRoute
+    }
+    '/v1/mon-models/glb/$species': {
+      id: '/v1/mon-models/glb/$species'
+      path: '/v1/mon-models/glb/$species'
+      fullPath: '/v1/mon-models/glb/$species'
+      preLoaderRoute: typeof V1MonModelsGlbSpeciesRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/v1/mons/$id/care': {
       id: '/v1/mons/$id/care'
@@ -404,9 +504,14 @@ const rootRouteChildren: RootRouteChildren = {
   OauthSignInRoute: OauthSignInRoute,
   V1EggsRoute: V1EggsRouteWithChildren,
   V1GuardianConsentsRoute: V1GuardianConsentsRoute,
+  V1MonLingoRoute: V1MonLingoRoute,
+  V1MonVoiceRoute: V1MonVoiceRoute,
   V1WaitlistRoute: V1WaitlistRoute,
+  V1MeCompanionMemoryRoute: V1MeCompanionMemoryRoute,
   V1MeEggsRoute: V1MeEggsRoute,
   V1MeMonsRoute: V1MeMonsRoute,
+  V1MonsAdoptRoute: V1MonsAdoptRoute,
+  V1MonModelsGlbSpeciesRoute: V1MonModelsGlbSpeciesRoute,
   V1MonsIdCareRoute: V1MonsIdCareRoute,
 }
 export const routeTree = rootRouteImport

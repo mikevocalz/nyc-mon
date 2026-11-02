@@ -23,7 +23,7 @@ test('the copy lengths the ui fit test mirrors', () => {
   assert.equal(EGG_COPY['m10.title'].length, 33);
   assert.equal(EGG_COPY['m10.body'].length, 76);
   assert.equal(EGG_COPY['m08.title'].length, 13);
-  assert.equal(EGG_COPY['m08.santoro.caption'].length, 42);
+  assert.equal(EGG_COPY['m08.santoro.caption'].length, 41);
 });
 
 test('M10 stack: title, body, ring, ready, actions, Start', () => {
@@ -37,9 +37,16 @@ test('M10 stack: title, body, ring, ready, actions, Start', () => {
   ]);
 });
 
-test('M10 side: the ring may reach 360; 600-wide screens cap the stacked ring at 300', () => {
-  assert.equal(incubateFitBlocks(base, true).find((b) => b.kind === 'media')?.maxPt, 360);
-  assert.equal(incubateFitBlocks({ ...base, widthDp: 640 }, false).find((b) => b.kind === 'media')?.maxPt, 300);
+test('M10 side: the ring may reach 360; a tablet-sized screen grows the stacked ring', () => {
+  const cap = (widthDp: number, side = false) => incubateFitBlocks({ ...base, widthDp }, side).find((b) => b.kind === 'media')?.maxPt;
+  assert.equal(cap(400, true), 360);
+  // Phones, up to the 440 pt body: unchanged.
+  assert.equal(cap(400), 260);
+  assert.equal(cap(439), 260);
+  // Tablet shell (iPad body 600, screen content ~550): 70 % of the width, 300..420.
+  assert.equal(cap(440), 308);
+  assert.equal(cap(552), 386);
+  assert.equal(cap(640), 420);
 });
 
 test('M10 busy and error states change only their own blocks', () => {
@@ -57,11 +64,11 @@ test('M10 arrangement: side on a landscape screen, never in the list layout', ()
 
 test('M08 browsing: head, triptych, actions', () => {
   assert.deepEqual(meetFitBlocks({
-    titleChars: 13, captionChars: 42, santoroChars: 0, headInScreen: true, listLayout: false,
+    titleChars: 13, captionChars: 41, santoroChars: 0, headInScreen: true, listLayout: false,
     cardShown: false, confirming: false, actionsShown: true, fontScale: 1,
   }), [
     { kind: 'text', role: 'title', chars: 13 },
-    { kind: 'text', role: 'body', chars: 42, tight: true },
+    { kind: 'text', role: 'body', chars: 41, tight: true },
     { kind: 'media', minPt: TRIPTYCH_MIN_DP, maxPt: 10_000 },
     { kind: 'controls', size: 'sm', minRowWidthPt: 320 },
   ]);

@@ -28,25 +28,46 @@ export interface GameScreenState {
    */
   viewState: GameViewState | null;
   /**
-   * World load, 0..100, set at real milestones of the current attempt
-   * (LOAD_STAGES): never estimated from time. 100 once the first frame lands.
+   * World load, 0..100, from the measured work of the current attempt
+   * (LOAD_STAGES): never estimated from time. Fractional inside a stage (the
+   * world build's checkpoints, one step per compiled pipeline object); the
+   * labels round it. 100 once the first frame lands, never before.
    */
   loadProgress: number;
 }
 
-/** Where each load milestone puts the bar. Ordered; progress never moves backwards. */
+/**
+ * Where each load stage ends on the bar. Ordered; a stage's fractional reports fill the band from the previous
+ * stage's end to its own, and progress never moves backwards. Bands follow the work: the import and renderer init
+ * are short, the synchronous world build is long, compileAsync builds the main-pass pipelines one render object per
+ * step, and the warm-up frames (load-game-scene.ts planWarmUp) build the rest, the MRT, post and shadow pipelines, a
+ * few materials per frame.
+ */
 export const LOAD_STAGES = {
   /** The scene module import has started. */
-  requested: 5,
-  /** three.js and the scene module are loaded. */
-  moduleLoaded: 35,
-  /** The city meshes, materials and actors are built. */
-  worldBuilt: 75,
-  /** Shader pipelines are compiled and a frame using them was drawn. */
-  firstRender: 90,
-  /** The first frame landed. */
+  requested: 3,
+  /** three.js and the scene module are loaded and the renderer is initialised. */
+  moduleLoaded: 10,
+  /** The city meshes, materials and actors are built (world/index.ts reports its checkpoints on the way). */
+  worldBuilt: 40,
+  /** compileAsync has built the main pass (it reports loaded / total objects on the way). */
+  compile: 70,
+  /** Every warm-up chunk has been drawn: all pipelines exist. */
+  firstRender: 99,
+  /** The first frame after the warm-up landed: the world is ready. Only firstFrame() sets it. */
   done: 100,
 } as const;
+
+export type LoadStage = Exclude<keyof typeof LOAD_STAGES, 'done'>;
+const STAGE_ORDER = Object.keys(LOAD_STAGES) as (keyof typeof LOAD_STAGES)[];
+
+/** Bar value for `fraction` (0..1) of the way through `stage`. */
+export function loadProgressAt(stage: LoadStage, fraction = 1): number {
+  const i = STAGE_ORDER.indexOf(stage);
+  const start = i === 0 ? 0 : LOAD_STAGES[STAGE_ORDER[i - 1]!];
+  const f = Number.isFinite(fraction) ? Math.min(1, Math.max(0, fraction)) : 1;
+  return start + (LOAD_STAGES[stage] - start) * f;
+}
 
 export const gameScreenStore = createStore<GameScreenState>(() => ({
   canvasFailed: false,
@@ -64,10 +85,14 @@ export const gameScreenActions = {
   firstFrame() {
     if (!gameScreenStore.getState().firstFrame) gameScreenStore.setState({ firstFrame: true, loadProgress: LOAD_STAGES.done });
   },
-  /** Advance the load bar to a milestone; an earlier milestone after a later one is ignored. */
-  loadStage(stage: keyof typeof LOAD_STAGES) {
-    const value = LOAD_STAGES[stage];
-    if (gameScreenStore.getState().loadProgress < value) gameScreenStore.setState({ loadProgress: value });
+  /**
+   * Advance the load bar to `fraction` of `stage` (the whole stage when omitted); anything at or behind the bar is
+   * ignored. The bar stops short of 100 until firstFrame().
+   */
+  loadStage(stage: LoadStage, fraction = 1) {
+    const value = loadProgressAt(stage, fraction);
+    const state = gameScreenStore.getState();
+    if (!state.firstFrame && state.loadProgress < value) gameScreenStore.setState({ loadProgress: value });
   },
   retry() {
     gameScreenStore.setState((s) => ({ canvasFailed: false, firstFrame: false, loadProgress: 0, attempt: s.attempt + 1 }));

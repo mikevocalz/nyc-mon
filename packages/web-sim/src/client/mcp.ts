@@ -50,6 +50,16 @@ export async function connectMcp(opts: {
     if (err instanceof UnauthorizedError) throw new SignInRequired('Sign in to talk to your Mon.');
     throw err;
   }
+  return {
+    client,
+    tools: await listAllTools(client),
+    serverName: client.getServerVersion()?.name ?? 'MCP server',
+    close: () => client.close(),
+  };
+}
+
+/** Every tool the server lists, across pages. */
+export async function listAllTools(client: Client): Promise<Tool[]> {
   const tools: Tool[] = [];
   let cursor: string | undefined;
   do {
@@ -57,12 +67,7 @@ export async function connectMcp(opts: {
     tools.push(...page.tools);
     cursor = page.nextCursor;
   } while (cursor);
-  return {
-    client,
-    tools,
-    serverName: client.getServerVersion()?.name ?? 'MCP server',
-    close: () => client.close(),
-  };
+  return tools;
 }
 
 /** Start sign-in: discovery + PKCE, then a redirect to the authorization server. */

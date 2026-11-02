@@ -15,10 +15,10 @@ pnpm --filter @acme/mcp-server typecheck
 ## Endpoints
 
 - `POST /mcp`: JSON-RPC. Initialize with `2025-11-25`, `2025-06-18` or `2025-03-26` (Alexa sends 2025-03-26) and the server answers with the same version.
-- `GET /.well-known/oauth-protected-resource` and `…/oauth-protected-resource/mcp`: RFC 9728 metadata. `resource` is the exact `MCP_RESOURCE_URI`.
+- `GET /.well-known/oauth-protected-resource` and `…/oauth-protected-resource/mcp`: RFC 9728 metadata. `resource` is the exact `MCP_RESOURCE_URI`. The document is public, so it is served with `Access-Control-Allow-Origin: *` to any origin, and `OPTIONS` on either path answers 204.
 - `GET /healthz`.
 
-An `Origin` header that is not the resource's own origin or listed in `MCP_ALLOWED_ORIGINS` gets 403. A request with no `Origin` passes, which is how Alexa calls.
+On `/mcp`, an `Origin` header that is not the resource's own origin or listed in `MCP_ALLOWED_ORIGINS` gets 403. A request with no `Origin` passes, which is how Alexa calls.
 
 ## Auth
 
@@ -31,7 +31,9 @@ Tokens come from the issuer on admin-vite (lane B, `docs/alexa/AUTH.md`) and are
 | `mcp:caller` | read tools | care tools → 403 |
 | `mcp:care` | feed, rest, wake, play | read tools → 403 |
 
-No 401 or 403 carries `WWW-Authenticate`, per Amazon. Clients find the metadata at the well-known path.
+The token is checked before the body is read, so an anonymous request gets 401 whatever it sent (an empty POST included).
+
+By default no 401 or 403 carries `WWW-Authenticate`, per Amazon; Alexa finds the metadata at the well-known path. With `MCP_WWW_AUTHENTICATE=1` (the browser companion's host), refusals carry the MCP spec's challenge: `Bearer resource_metadata="<origin>/.well-known/oauth-protected-resource/mcp"`, plus `error="invalid_token"` for a bad or expired token, or `error="insufficient_scope"` and `scope="mcp:caller mcp:care"` on a 403. `Access-Control-Expose-Headers` lists `www-authenticate` so a browser client can read it.
 
 Accounts must be 18 or older. A token whose `birth_year` claim says otherwise gets an `adults-only` result before any `/v1` call. `/v1` enforces the same rule from the Users record on every on-behalf-of request, so a token without the claim is still checked.
 
@@ -41,7 +43,7 @@ The server never forwards the Alexa token. It calls `/v1` with its own key (`X-N
 
 ## Tools
 
-Every build: `get_mon_status`, `check_on_mon`, `check_incubation`, `talk_to_mon`, `feed_mon` (Share a meal, no item), `rest_mon`, `wake_mon`, `play_with_mon` (optional `quality`, 0 to 1). Each has an output schema. A care action the Mon would decline (feeding it while asleep, say) returns `applied: false` with the reason and writes nothing. Care writes go to `PUT /v1/mons/:id/care` under a per-Caller device id with a clock-based seq that stays monotonic across restarts. The `Idempotency-Key` is a hash of the Caller, Mon, action and JSON-RPC request id, so a resent `tools/call` reuses the key, seq and time and `/v1` replays it instead of applying it twice. If a PUT times out, the server re-reads the Mon: a write that landed is reported normally, and one that can't be confirmed says so instead of failing blindly.
+Every build: `get_mon_status`, `check_on_mon`, `check_incubation`, `hatch_egg`, `talk_to_mon`, `feed_mon` (Share a meal, no item), `rest_mon`, `wake_mon`, `play_with_mon` (optional `quality`, 0 to 1). Each has an output schema. A care action the Mon would decline (feeding it while asleep, say) returns `applied: false` with the reason and writes nothing. Care writes go to `PUT /v1/mons/:id/care` under a per-Caller device id with a clock-based seq that stays monotonic across restarts. The `Idempotency-Key` is a hash of the Caller, Mon, action and JSON-RPC request id, so a resent `tools/call` reuses the key, seq and time and `/v1` replays it instead of applying it twice. If a PUT times out, the server re-reads the Mon: a write that landed is reported normally, and one that can't be confirmed says so instead of failing blindly. `hatch_egg` calls `POST /v1/eggs/:id/hatch` for the Caller's own egg (Caller-only, `mcp:care`). Before incubation ends it refuses with the minutes left; a repeat returns the Mon the first call minted. It sends no `Idempotency-Key`, because `/v1` stores a 409 under the key and would replay it after the egg is ready; the route is idempotent on its own. Its result carries `hatching: true` the first time, and the card plays the hatch.
 
 Dev and simulator mode only (`MCP_DEV_MODE=1`): `get_familiar_people`, `get_present_people`, `get_person_relationship`, `get_shared_memories`, `acknowledge_person`, `inject_presence_event`. They run on seeded fictional people (James, Dana). There are no voiceprints and no real enrollment (ADR 0015 §2). In this mode the care tools and `talk_to_mon` also accept `speakerHint`. A hinted person counts only with a fresh presence event; otherwise the turn may talk but not give care.
 
@@ -53,4 +55,4 @@ Lane C's `mcpAppsRegistration()` (`src/ui`) registers the `ui://nyc-mon/…` res
 
 ## Env
 
-`MCP_PORT` (8788) · `MCP_RESOURCE_URI` (`http://localhost:8788/mcp`) · `MCP_ALLOWED_ORIGINS` · `AUTH_ISSUER` · `MCP_TOKEN_VERIFIER` (`jwt` | `introspection`) · `AUTH_JWKS_URL` · `AUTH_INTROSPECTION_URL` / `_CLIENT_ID` / `_CLIENT_SECRET` · `V1_BASE_URL` · `V1_MCP_SERVICE_KEY` (32+ chars) · `V1_TIMEOUT_MS` (400) · `OAUTH_DEV_BYPASS` · `MCP_DEV_MODE`. `src/env.ts` validates them at startup and names every missing value.
+`MCP_PORT` (8788) · `MCP_RESOURCE_URI` (`http://localhost:8788/mcp`) · `MCP_ALLOWED_ORIGINS` · `AUTH_ISSUER` · `MCP_TOKEN_VERIFIER` (`jwt` | `introspection`) · `AUTH_JWKS_URL` · `AUTH_INTROSPECTION_URL` / `_CLIENT_ID` / `_CLIENT_SECRET` · `V1_BASE_URL` · `V1_MCP_SERVICE_KEY` (32+ chars) · `V1_TIMEOUT_MS` (400) · `OAUTH_DEV_BYPASS` · `MCP_DEV_MODE` · `MCP_WWW_AUTHENTICATE` (0) · `MCP_RATE_LIMIT_PER_MINUTE` (120 per Caller or service client; 0 turns it off; past it, 429 with `Retry-After`). `src/env.ts` validates them at startup and names every missing value.

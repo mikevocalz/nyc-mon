@@ -64,6 +64,29 @@ export function arcadeRiveFromFiles(files: { stick?: RiveFile; cluster?: RiveFil
   };
 }
 
+/**
+ * The artboard names inside the merged `arcade.riv` — generated from the
+ * three sibling projects by `packages/ui/rive/arcade-controls/arcade/
+ * merge.mjs` and verified byte-identical to the per-file builds.
+ */
+export const MERGED_STICK_ARTBOARD = 'LeftStick';
+export const MERGED_CLUSTER_ARTBOARD = 'RightSix';
+export const MERGED_PILL_ARTBOARD = 'StartStop';
+
+/**
+ * Shares one already-loaded merged file across the three controls: one
+ * `useRiveFile` parse instead of three. The Thumbpad surface keeps its own
+ * hardcoded artboard/state-machine names, so it is not listed here.
+ */
+export function arcadeRiveFromFile(file: RiveFile | undefined): ArcadeControllerRive {
+  if (!file) return {};
+  return {
+    stick: { file, artboardName: MERGED_STICK_ARTBOARD },
+    cluster: { file, artboardName: MERGED_CLUSTER_ARTBOARD },
+    pill: { file, artboardName: MERGED_PILL_ARTBOARD },
+  };
+}
+
 /** Props of {@linkcode ArcadeController}. */
 export interface ArcadeControllerProps
   extends Pick<AdaptiveControlLayoutProps, 'savedLayouts' | 'insets' | 'hardwareFamily' | 'runtime' | 'hideTouchControls' | 'onLayoutResolved'> {
@@ -95,6 +118,13 @@ export interface ArcadeControllerProps
   readonly onStopHoldStart?: () => void;
   /** The hold ended before completing; nothing was requested. */
   readonly onStopReleased?: () => void;
+  /**
+   * A release inside the tap window while the pill is in `stopConfirm`: the
+   * press meant pause/resume, so the owner cancels the confirm and toggles.
+   * Not a router request — each request kind re-evaluates the session, so a
+   * pause-request+resume-request pair would toggle twice and net zero.
+   */
+  readonly onStopShortPress?: () => void;
   /** Optional content over the clear sightline; never a control. */
   readonly stage?: (slot: Parameters<NonNullable<AdaptiveControlLayoutProps['stage']>>[0]) => ReactNode;
   readonly testID?: string;
@@ -137,6 +167,7 @@ export function ArcadeController({
   onStart,
   onStopHoldStart,
   onStopReleased,
+  onStopShortPress,
   stage,
   savedLayouts,
   insets,
@@ -240,6 +271,7 @@ export function ArcadeController({
           ...common,
           state: 'playing' as const,
           onPause: () => { haptics.toggle(); router.pauseRequest(source); },
+          onShortPress: onStopShortPress,
           onStopHoldStart,
           onStopHoldComplete: () => { haptics.stopConfirm(); router.stopRequest(source); },
           onStopReleased,
@@ -249,6 +281,7 @@ export function ArcadeController({
           ...common,
           state: 'paused' as const,
           onResume: () => { haptics.toggle(); router.resumeRequest(source); },
+          onShortPress: onStopShortPress,
           onStopHoldStart,
           onStopHoldComplete: () => { haptics.stopConfirm(); router.stopRequest(source); },
           onStopReleased,
@@ -260,6 +293,7 @@ export function ArcadeController({
           progress: stopProgress,
           onStopHoldComplete: () => { haptics.stopConfirm(); router.stopRequest(source); },
           onStopReleased: onStopReleased ?? (() => undefined),
+          onShortPress: onStopShortPress ?? (onStopReleased ?? (() => undefined)),
         };
       case 'disabled':
         return { ...common, state: 'disabled' as const };

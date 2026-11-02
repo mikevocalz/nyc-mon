@@ -38,10 +38,32 @@ export function deviceId(): string {
 }
 
 /**
+ * A just-created account owns no server Caller, so there is nothing to
+ * restore: start its save on this device. Without it, boot reads "session,
+ * no save" as a returning player and routes to `restore`, which sends the
+ * player back to sign-in, which routes home to `restore` again.
+ */
+export function startSaveForNewAccount(nowMs: number): void {
+  if (readSave() === undefined) writeSave(createEmptySave(deviceId(), nowMs));
+}
+
+/**
  * Writes the Caller record into the save (M07 Continue). Creates an empty
  * save first when none exists yet. The caller is only set once: a stored
  * profile is left alone so a resume cannot overwrite it.
  */
+/**
+ * Changes the stored Caller name (Settings). Only an existing Caller can be
+ * renamed; returns the new save, or undefined when there is no Caller yet.
+ */
+export function renameCaller(callerName: string, nowMs: number): SaveCurrent | undefined {
+  const save = readSave();
+  if (save?.caller == null) return undefined;
+  const next: SaveCurrent = { ...save, caller: { ...save.caller, callerName }, savedAt: nowMs };
+  writeSave(next);
+  return next;
+}
+
 export function storeCallerProfile(caller: CallerProfile, nowMs: number): SaveCurrent {
   const save = readSave() ?? createEmptySave(deviceId(), nowMs);
   const next: SaveCurrent = { ...save, caller, savedAt: nowMs };

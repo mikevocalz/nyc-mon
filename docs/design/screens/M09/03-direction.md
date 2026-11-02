@@ -67,7 +67,7 @@ The tilt pivot is authored per still (`TODO(lookdev)`); until then it rotates ab
 
 ## Sound
 
-Slot only: `m09.sound.attention` per bloodline, off until Q32 closes and assets exist. When it ships, it obeys the OS silent switch and never plays per keystroke.
+Slot only: `m09.sound.attention` per bloodline, off until assets exist (Q32 closed by Decision 32: the reaction is first-day babble). When it ships, it obeys the OS silent switch and never plays per keystroke.
 
 ## No-list
 

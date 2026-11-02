@@ -1,9 +1,20 @@
+import type { MonLingo } from '@acme/content/lingo';
 import type { CareAction, CareState, EggRecord, MonInstance } from '@acme/core';
 
 /** One Mon with its stored care state, as `/v1/me/mons` returns it. */
 export interface MonWithCare {
   readonly mon: MonInstance;
   readonly care: CareState;
+}
+
+/** The Caller's Mons and the companion they chose, as `/v1/me/mons` returns them. */
+export interface CallerMons {
+  readonly mons: readonly MonWithCare[];
+  /**
+   * `users.activeMonInstanceId`: the Mon the Caller chose. Null when none is
+   * chosen or `/v1` predates the field. It can name a Mon no longer in `mons`.
+   */
+  readonly activeMonInstanceId: string | null;
 }
 
 /** One unhatched egg, as `/v1/me/eggs` returns it. */
@@ -29,8 +40,14 @@ export interface CareWriteIntent {
  * contract (ADR 0001 §1.4). Methods throw the errors in `./errors.ts`.
  */
 export interface CallerData {
+  /**
+   * `GET /v1/mon-lingo`: the Mon's lines and lingo as Payload publishes them.
+   * Optional so a test double can leave it out; the tools then use the
+   * bundled fallback.
+   */
+  monLingo?(callerId: string): Promise<MonLingo>;
   /** `GET /v1/me/mons`. */
-  listMons(callerId: string): Promise<readonly MonWithCare[]>;
+  listMons(callerId: string): Promise<CallerMons>;
   /** `GET /v1/me/eggs`. */
   listIncubatingEggs(callerId: string): Promise<readonly IncubatingEgg[]>;
   /**
@@ -40,4 +57,12 @@ export interface CallerData {
    * Throws `WriteUnconfirmedError` when the write was sent but not answered.
    */
   applyCare(write: CareWriteIntent): Promise<MonWithCare>;
+  /**
+   * `POST /v1/eggs/:id/hatch` for one of the Caller's own eggs. Returns the
+   * Mon it hatched into. Idempotent on the server: a second call for the same
+   * egg returns the Mon the first one minted. Throws `EggNotReadyError` while
+   * the egg is still incubating and `NotFoundError` when the Caller has no
+   * such egg.
+   */
+  hatchEgg(callerId: string, eggId: string): Promise<MonInstance>;
 }

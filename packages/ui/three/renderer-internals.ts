@@ -39,3 +39,33 @@ export const advanceNodeFrame = (renderer: WebGPURenderer) => {
   nodeFrame?.update?.();
   if (nodeFrame?.frameId !== undefined) (renderer.info as { frame: number }).frame = nodeFrame.frameId;
 };
+
+/**
+ * `Renderer.dispose()` (r186) never destroys the default canvas target's
+ * colour and depth buffers: the WebGPU backend makes them straight on the
+ * device (WebGPUTextureUtils getColorBuffer / getDepthBuffer) with no dispose
+ * listener, and every renderer here shares the app-wide GPUDevice, so they
+ * wait for a GC. With `antialias` they are 4x multisampled: about 100 MB for
+ * the city's 1206x2622 buffer. Call before `renderer.dispose()`. WebGL2 has
+ * no such textures (the backend's data has no `texture`), so it is a no-op there.
+ */
+type CanvasTargetInternals = {
+  _canvasTarget?: { colorTexture?: object | null; depthTexture?: object | null } | null;
+  backend?: { get?: (object: object) => { texture?: { destroy?: () => void } } } | null;
+};
+export const releaseCanvasBuffers = (renderer: WebGPURenderer): number => {
+  const internals = renderer as unknown as CanvasTargetInternals;
+  const target = internals._canvasTarget;
+  const get = internals.backend?.get;
+  if (!target || typeof get !== 'function') return 0;
+  let destroyed = 0;
+  for (const texture of [target.colorTexture, target.depthTexture]) {
+    if (!texture) continue;
+    const data = get.call(internals.backend, texture);
+    if (typeof data?.texture?.destroy !== 'function') continue;
+    data.texture.destroy();
+    data.texture = undefined;
+    destroyed += 1;
+  }
+  return destroyed;
+};

@@ -26,12 +26,14 @@ export const W01_COPY = {
   /** A photograph's place caption: district, then cross streets when canon gives a place. */
   placeCaption: (district: District, place?: string) =>
     place ? `${DISTRICT_COPY[district].name}, ${place}` : DISTRICT_COPY[district].name,
+  /** Where a Mon's picture does not exist yet: the app's own label for missing art (mons.comingSoon). */
+  comingSoon: 'Coming Soon',
   /** The hero poster's caption: the landmark and its cross streets, never the picked district (PS-026). */
   landmarkCaption: (title: string, place?: string) => (place ? `${title}, ${place}` : title),
   hero: {
     title: HOME_COPY.tagline,
     titleLines: TITLE_LINES,
-    body: 'Pick one of three eggs from Dr.\u00a0Alessandra Santoro. Be there when it hatches. Then look after your Mon on the same blocks you walk.',
+    body: 'Pick one of four eggs from Dr.\u00a0Alessandra Santoro. Be there when it hatches. Then look after your Mon on the same blocks you walk.',
     cta: WAITLIST_CTA.label,
     ctaHref: WAITLIST_CTA.href,
     districtLabel: 'Pick a district',
@@ -90,7 +92,7 @@ export const W01_COPY = {
   },
   starters: {
     eyebrow: 'The starters',
-    title: "Three eggs on Dr.\u00a0Santoro's table.",
+    title: "Four eggs on Dr.\u00a0Santoro's table.",
     /** The egg names come from @acme/content, in starter slot order. */
     body: (eggNames: readonly string[]) =>
       `${eggNames.slice(0, -1).join(', ')} and ${eggNames.at(-1) ?? ''}. Each holds a Mon from a different Bloodline. You pick an egg. Your Mon decides the rest at the hatch.`,

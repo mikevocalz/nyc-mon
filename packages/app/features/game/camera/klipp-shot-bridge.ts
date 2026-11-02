@@ -8,7 +8,7 @@
  * runtime once shot state is mirrored there.
  */
 import { BlendCurves, hardLookAt, type BlendDefinition, type CameraState } from '@pmndrs/klipp';
-import { KlippThree } from '@pmndrs/klipp/three';
+import { KlippThree, writeCameraLens } from '@pmndrs/klipp/three';
 import type { PerspectiveCamera } from 'three';
 
 export type ShotVec3 = readonly [number, number, number];
@@ -72,7 +72,7 @@ export function sanitizeKlippShot(input: KlippCameraShot | null | undefined): Kl
   if (!finite(input.fov) || !finite(input.near) || !finite(input.far)) return null;
   const qlen = Math.hypot(quaternion[0], quaternion[1], quaternion[2], quaternion[3]);
   if (!(qlen > 1e-6)) return null;
-  const near = clamp(input.near, SHOT_MIN_NEAR, SHOT_MAX_FAR);
+  const near = clamp(input.near, SHOT_MIN_NEAR, SHOT_MAX_FAR - SHOT_MIN_GAP);
   const far = clamp(input.far, near + SHOT_MIN_GAP, SHOT_MAX_FAR);
   const out: {
     -readonly [K in keyof KlippCameraShot]: KlippCameraShot[K];
@@ -213,6 +213,9 @@ export function createKlippShotRig(camera: PerspectiveCamera): KlippShotRig {
     },
     setSize(width, height) {
       klipp.setSize(width, height);
+      // Klipp 0.14's setSize does not invalidate an unchanged lens. Reapply
+      // its authored normalized offset so a settled shot survives resizing.
+      writeCameraLens(camera, klipp.shot, width, height);
     },
     update(dt) {
       const now = typeof performance !== 'undefined' ? performance.now() : Date.now();

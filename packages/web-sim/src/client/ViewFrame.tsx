@@ -23,6 +23,7 @@ export function ViewFrame({ ref, title, src, hidden, status, style }: {
       sandbox={SANDBOX_ATTRIBUTE}
       hidden={hidden}
       data-status={status}
+      aria-busy={status === 'loading'}
       style={style}
       className="block w-full shrink-0 border-0 bg-transparent"
     />

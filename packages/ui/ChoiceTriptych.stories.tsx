@@ -18,12 +18,12 @@ const meta = { title: 'Hatch/ChoiceTriptych' } satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const TONES = ['bg-orange-300', 'bg-carolina-300', 'bg-leaf-300'] as const;
-const NAMES = ['Metro Egg', 'Corner Egg', 'Prism Egg'] as const;
+const TONES = ['bg-orange-300', 'bg-carolina-300', 'bg-leaf-300', 'bg-apple-300'] as const;
+const NAMES = ['Metro Egg', 'Corner Egg', 'Prism Egg', 'Signal Egg'] as const;
 const ITEMS: ChoiceTriptychItem[] = NAMES.map((name, i) => ({
-  key: ['F01', 'F02', 'F12'][i]!,
+  key: ['F01', 'F02', 'F12', 'F04'][i]!,
   label: name,
-  accessibilityLabel: `${name}, egg ${i + 1} of 3`,
+  accessibilityLabel: `${name}, egg ${i + 1} of 4`,
   media: <View className={`flex-1 ${TONES[i]}`} />,
 }));
 
@@ -62,7 +62,7 @@ function Demo({ initial = null, reducedMotion = false, night = false, placement 
       </View>
       <View className="flex-row items-center gap-4 self-start bg-hlynk-core-body p-3">
         <Trackpad
-          label={focused === null ? 'Eggs' : `${NAMES[focused]}, ${focused + 1} of 3`}
+          label={focused === null ? 'Eggs' : `${NAMES[focused]}, ${focused + 1} of 4`}
           reducedMotion={reducedMotion}
           onActivate={() => step(1)}
           onStep={step}

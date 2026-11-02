@@ -25,7 +25,9 @@ const band = tv({
       danger: { root: 'bg-danger', headline: 'text-on-danger', detail: 'text-on-danger' },
     },
     size: {
-      hero: { root: 'min-h-16 py-3', headline: 'text-2xl leading-8' },
+      // The hero wraps: on a phone the detail drops under the headline instead of
+      // being squeezed to one glyph a line beside it.
+      hero: { root: 'min-h-16 flex-wrap gap-y-1 py-3', headline: 'min-w-0 shrink text-2xl leading-8' },
       strip: { root: 'h-11', headline: 'text-sm' },
     },
   },
@@ -50,7 +52,7 @@ export function SignageBand({ tone, headline, detail, action, size = 'hero', cla
       {detail ? (
         // <output> is a polite live region: announced when the tone (and so
         // the band's meaning) changes.
-        <Output key={tone} className="min-w-0 flex-1">
+        <Output key={tone} className={size === 'hero' ? 'min-w-48 flex-1' : 'min-w-0 flex-1'}>
           <Text className={s.detail()}>{detail}</Text>
         </Output>
       ) : null}

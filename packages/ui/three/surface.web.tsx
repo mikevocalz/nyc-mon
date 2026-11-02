@@ -2,7 +2,7 @@
 
 import { createElement, useImperativeHandle, type Ref } from 'react';
 import { useInstanceStore } from '../use-instance-store';
-import type { ThreeSurfaceHandle } from './types';
+import type { AndroidSurfaceType, ThreeSurfaceHandle } from './types';
 
 /**
  * Web: a canvas element that fills its parent. WebGPURenderer gets the
@@ -11,7 +11,9 @@ import type { ThreeSurfaceHandle } from './types';
  * A canvas is the one non-semantic host the UI layer allows; no semantic
  * wrapper exists for it, hence createElement.
  */
-export function ThreeSurface({ ref }: { ref?: Ref<ThreeSurfaceHandle> }) {
+// `androidSurfaceType` is accepted for signature parity with the native fork;
+// a DOM <canvas> has no backing-view choice.
+export function ThreeSurface({ ref, androidSurfaceType: _ignored }: { ref?: Ref<ThreeSurfaceHandle>; androidSurfaceType?: AndroidSurfaceType }) {
   // The DOM node lives in a per-instance store, written when React attaches
   // it and read only from the imperative handle, never during render.
   const node = useInstanceStore<{ canvas: HTMLCanvasElement | null }>(() => ({ canvas: null }));

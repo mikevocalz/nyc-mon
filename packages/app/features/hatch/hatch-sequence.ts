@@ -5,12 +5,14 @@ export type HatchPhase = Extract<HatchState, { kind: 'presenting' }>['phase'];
 
 /**
  * Phase lengths in ms (M12 03-direction.md "Sequence" and "Reduced motion").
+ * `stir` and `pressure` keep the timings of the case beats they replace
+ * (Decision 29), so the hatch still runs about eight seconds.
  * `attention` is the lean-in length; a hesitation stays open until the Caller
  * holds the trackpad or presses "Stay close".
  */
 export const PHASE_MS: Record<'full' | 'reduced', Record<HatchPhase, number>> = {
-  full: { 'case-open': 1000, scanner: 800, crack: 2400, burst: 500, emerge: 1800, attention: 1500 },
-  reduced: { 'case-open': 300, scanner: 400, crack: 450, burst: 300, emerge: 400, attention: 1500 },
+  full: { stir: 1000, pressure: 800, crack: 2400, burst: 500, emerge: 1800, attention: 1500 },
+  reduced: { stir: 300, pressure: 400, crack: 450, burst: 300, emerge: 400, attention: 1500 },
 };
 
 /** The skip control appears this long after `open`, never before (M12 copy, 03-direction.md). */
@@ -55,4 +57,23 @@ export function resolveHatchEntry(input: {
     case 'ready':
       return input.fromM11 ? { kind: 'open-now' } : { kind: 'pre' };
   }
+}
+
+/**
+ * The egg's own movement before it cracks (Decision 29). `stir` and
+ * `pressure` are each phase's 0–1 progress. Stir: two nudges from inside,
+ * the second stronger, back to rest by the phase end. Pressure: the shell
+ * swells in two pulses that grow, back to rest size when `crack` starts.
+ * Reduced motion: no wobble; the egg holds a slightly fuller pose through
+ * pressure, the authored still for that beat. A worklet, so the screen reads
+ * it on the UI thread.
+ */
+export function eggPrecrackPose(stir: number, pressure: number, reducedMotion: boolean): { rotateDeg: number; scale: number } {
+  'worklet';
+  const s = stir <= 0 ? 0 : stir >= 1 ? 1 : stir;
+  const p = pressure <= 0 ? 0 : pressure >= 1 ? 1 : pressure;
+  if (reducedMotion) return { rotateDeg: 0, scale: p > 0 && p < 1 ? 1.02 : 1 };
+  const rotateDeg = 3 * Math.sin(s * Math.PI * 3) * Math.sin(s * Math.PI) * (s < 0.5 ? 0.6 : 1);
+  const scale = 1 + 0.03 * p * (0.5 + 0.5 * Math.sin(p * Math.PI * 4 - Math.PI / 2));
+  return { rotateDeg, scale };
 }

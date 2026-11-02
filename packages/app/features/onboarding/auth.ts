@@ -1,6 +1,7 @@
 'use client';
 
-import { createAuth, type Auth } from '@acme/auth';
+import { Platform } from 'react-native';
+import { APP_ORIGIN, createAuth, type Auth } from '@acme/auth';
 
 /**
  * The auth surface for the app: `EXPO_PUBLIC_AUTH_URL` names the admin-vite
@@ -14,7 +15,10 @@ let cached: Auth | undefined;
 
 /** The shared auth client; built once. */
 export function auth(): Auth {
-  cached ??= createAuth({ baseURL: AUTH_BASE_URL });
+  cached ??= createAuth({
+    baseURL: AUTH_BASE_URL,
+    appOrigin: Platform.OS === 'web' ? undefined : APP_ORIGIN,
+  });
   return cached;
 }
 

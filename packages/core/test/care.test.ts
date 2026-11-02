@@ -100,6 +100,16 @@ describe('care actions', () => {
     );
   });
 
+  it('a meal adds a little Energy too: 5 for every 40 Fullness, as v7\'s full meal', () => {
+    const tired = advanceCare(makeState(), T0 + 6 * HOUR).state;
+    const shared = applyCareAction(tired, { kind: 'feed' }, T0 + 6 * HOUR).state.care;
+    expect(shared.energy).toBeCloseTo(tired.care.energy + DEFAULT_CARE_TUNING.sharedMealNutrition * (5 / 40), 12);
+    const named = applyCareAction(tired, { kind: 'feed', food: { foodClassId: 'f', nutrition: 0.4 } }, T0 + 6 * HOUR).state.care;
+    expect(named.energy).toBeCloseTo(tired.care.energy + 0.4 * (5 / 40), 12);
+    // Resting stays the real way back: a meal is a small lift.
+    expect(shared.energy - tired.care.energy).toBeLessThan(0.05);
+  });
+
   it('overfeeding makes the Mon sluggish, never sick, and sluggishness ends on its own', () => {
     let s = makeState();
     s = applyCareAction(s, { kind: 'feed', food: { foodClassId: 'f', nutrition: 0.5 } }, T0).state;

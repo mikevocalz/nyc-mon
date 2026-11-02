@@ -21,6 +21,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import sharp from 'sharp';
 import { build, type InlineConfig, type Plugin } from 'vite';
 import { viteSingleFile } from 'vite-plugin-singlefile';
+import { MON_MODEL_ORIGIN } from './model-origin.ts';
 import { UI_VIEWS, type UiViewId } from './views.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -41,7 +42,7 @@ const BABY_WIDTH = 400;
  */
 function creatureArt(): Plugin {
   const creatures = join(repoRoot, 'packages', 'assets', 'creatures');
-  const babies = new Set(['squeaklet', 'kittee-cee', 'yotito']);
+  const babies = new Set(['squeaklet', 'kittee-cee', 'yotito', 'fye-dot']);
   return {
     name: 'nyc-mon:creature-art',
     enforce: 'pre',
@@ -52,6 +53,21 @@ function creatureArt(): Plugin {
       const width = babies.has(stem) ? BABY_WIDTH : 16;
       const buf = await sharp(file).resize({ width }).webp({ quality: 70, effort: 6 }).toBuffer();
       return `export default ${JSON.stringify(`data:image/webp;base64,${buf.toString('base64')}`)};`;
+    },
+  };
+}
+
+/** The MCP sandbox cannot execute the shared KTX2 loader's WASM/worker decoder. */
+function sandboxTextureDecoders(): Plugin {
+  const sharedLoader = join(repoRoot, 'packages', 'ui', 'three', 'ktx2.ts');
+  return {
+    name: 'nyc-mon:sandbox-texture-decoders',
+    enforce: 'pre',
+    resolveId(source, importer) {
+      if (importer && source.startsWith('.') && resolve(dirname(importer), source) === sharedLoader) {
+        return join(viewDir, 'ktx2-sandbox.ts');
+      }
+      return null;
     },
   };
 }
@@ -82,6 +98,7 @@ async function buildView(view: UiViewId): Promise<string> {
       // The room carries the GridBand backdrop; the inline card does not.
       __GRID_BACKDROP__: JSON.stringify(view === 'mon-room'),
       'process.env.NODE_ENV': JSON.stringify('production'),
+      __MON_MODEL_ORIGIN__: JSON.stringify(MON_MODEL_ORIGIN),
     },
     build: {
       outDir,
@@ -90,7 +107,7 @@ async function buildView(view: UiViewId): Promise<string> {
     },
   };
   const config = await storybookConfig(base);
-  config.plugins = [creatureArt(), ...(config.plugins ?? []), viteSingleFile({ removeViteModuleLoader: true })];
+  config.plugins = [creatureArt(), sandboxTextureDecoders(), ...(config.plugins ?? []), viteSingleFile({ removeViteModuleLoader: true })];
   // CanvasKit cannot load in the MCP Apps sandbox; swap its web loader for a
   // stand-in that never fetches (view/skia-web-sandbox.ts).
   const alias = config.resolve?.alias;
@@ -131,7 +148,7 @@ export async function buildUi(): Promise<Record<UiViewId, UiManifestEntry>> {
     await writeFile(join(UI_DIST, file), html);
     manifest[view] = { file, hash, bytes: Buffer.byteLength(html) };
   }
-  await writeFile(join(UI_DIST, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+  await writeFile(join(UI_DIST, 'manifest.json'), `${JSON.stringify({ ...manifest, modelOrigin: MON_MODEL_ORIGIN }, null, 2)}\n`);
   return manifest;
 }
 

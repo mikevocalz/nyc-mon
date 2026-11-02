@@ -41,6 +41,34 @@ Limits: 20 000 buildings, 10 000 roads, 4 000 areas, 25 000 trees, 600 000 point
 - **NYCHA rule.** `nycha` comes only from an OSM `operator` or `owner` tag naming the New York City Housing Authority. Appearance never marks public housing (MOBILE_WORLD_PR_PACK, NYCHA constraint 3). OSM is not the verified NYCHA development dataset, so the class only picks a facade colour; no facelift or overlay is keyed on it until FUT-01 checks it against that dataset.
 - Roads: `width` tag, else `lanes` × 3.3 m, else a class default (primary 18 m, secondary 14 m, tertiary 12 m, residential 9 m). Sidewalks are symmetric class defaults (primary 6 m, secondary 5 m, tertiary and residential 4.5 m), dropped where OSM maps the sidewalk separately.
 
+## Dataset v3 (current) — Valdrada records
+
+Since PRs #74–#87 the tile is baked from **Valdrada** binary records
+(pinned tag `v0.4.0`, commit `2724c79`, MIT — `tooling/city/valdrada/LICENSE.valdrada`)
+matched to OSM way footprints. The pipeline lives in `tooling/city/`
+(README there; format and decisions in `docs/adr/0021-city-dataset-v3-valdrada.md`).
+Current tile: `harlem-apollo-20261017`, ~1.2 MB, 5 267 buildings, 1 255 roads,
+23 635 furniture pieces; 98% of buildings keep `osm:way:N` ids.
+
+v3 adds per-building record facts, each consumed by the renderer or honestly
+marked `estimate` when rule-derived:
+
+| Field | Content |
+| --- | --- |
+| `f`, `fh` | Recorded floor count and floor height in metres (`floors`, `floorHeightMeters` in `city-dataset.ts`) |
+| `d` | Detail bits: cornice, fire escape, stoop, water tower, storefront (bits 0–4). Bits 5–6 (setbacks, gable) are recorded but data-only — no mesh feature consumes them |
+| `sh`, `ww` | Storefront height / window pitch — drive the existing shader window grid via `uvScale`, no new materials |
+| `fi` | Recorded front-face index — re-aims landmark details (e.g. the Apollo marquee) at the real front |
+| `vs` | Valdrada `STYLE` id — record-derived compiler classification; `STYLE → class` stays a design estimate (DESIGN_SYSTEM §City) |
+| `e` | Estimate flags, preserved verbatim |
+| `l`, `ow`, `sp`, `sid` | Roads: lanes, one-way, speed, `segId` (CSCL physicalid) — the lane-graph anchors Living City consumes |
+| `sources[]` | 12-entry provenance list driving the Settings credits; audited in `docs/licenses/provenance-2026-10-17.md` |
+
+**Migration.** v2 saves keep their position: `resolveResume` applies the
+v2→v3 identity-position migration via `CITY_DATASET_MIGRATIONS`, and v3
+records absent a field fall back byte-identically to the v2 hash path
+(asserted in `city-mesh-v3.test.ts`).
+
 ## The baked tile (2026-10-15)
 
 Output of `node tooling/city/print-counts.mjs`, which parses the file with the app's own `parseCityDataset`:
@@ -74,6 +102,14 @@ Before the 2026-10-16 frame-budget pass (below), baked in node on the same Mac, 
 | `world/budget.ts` | Visible-triangle count, the rule the Duo measurement used. |
 | `world/walkability.ts`, `world/bundled-queries.ts` | `isWalkable(x, z)` and `cityGroundHeight(x, z)`. |
 | `world/palette.ts` | Material colours from `@acme/theme` tokens. |
+
+### react-native-webgpu rules
+
+**Update, 2026-10-27 (D19, ADR 0023).** The rule below came from a simulator. vg-demos-all `README.md` L23 reads: "On react-native-webgpu (checked on the iOS 27 simulator with three r186), shadow maps, three's output pass (tone mapping / sRGB) and `Color` scene backgrounds render a black frame." react-native-webgpu's own `apps/example/src/ThreeJS/PostProcessing.tsx` @ `3f4b0f0` runs `RenderPipeline`, `bloom()` and `NeutralToneMapping` and calls `context.present()` after the pipeline. Slop New York's `js/lighting.js` L143–146 explains the background case: a `Color` background forces a clear that wipes shadow cascade 0 while cascade 1 renders. Under `EXPO_PUBLIC_WORLD_PHYSICAL` the city uses sRGB output, ACES, sun shadows and post; with the flag off, the rule below still holds and the build is unchanged.
+
+Phase 0 device results (`docs/DEVICE_CHECKS.md` § Slop-grade city): **pending.** The iPad Pro probes run at the end of the 2026-10-27 session; iPhone 17 is open (no device cabled). No probe result exists yet, so nothing here claims the physical path renders on hardware.
+
+The rule as written for the cel city (history, still in force with the flag off):
 
 react-native-webgpu rules from the metro-live README, all followed: no shadow maps (a TSL contact shadow strip around every footprint, leaning away from the sun, stands in), no output pass (linear output, no tone mapping), and no `scene.background = Color` (an unlit dome drawn first; the renderer clear colour matches the horizon as a fallback). Colours are fed to three as linear values, so the frame shows the token colours as authored without switching off colour management for the app's other scenes.
 
@@ -244,4 +280,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-OpenStreetMap data © OpenStreetMap contributors, ODbL 1.0. The Game screen shows the attribution (`MapAttribution.tsx`).
+OpenStreetMap data © OpenStreetMap contributors, ODbL 1.0. Attribution surfaces in Settings under "Legal & credits", rendered from `map-data-credit.ts` (`CITY_MAP_SOURCES`) — the test in `map-data-credit.test.ts` keeps that list equal to the bundled tile's `sources` and asserts the game screen mounts no attribution HUD.
+
+## MIT notice (Slop New York)
+
+The physical mode behind `EXPO_PUBLIC_WORLD_PHYSICAL` (D19, ADR 0023) adapts rendering techniques from Slop New York by Mr.doob, https://github.com/mrdoob/slop-newyork @ `be65d0a`, MIT, © 2026 Mr.doob. The full licence text and the list of what is and is not taken are in `docs/licenses/slop-newyork-mit.md`. Each ported file names the Slop file and function it came from in its header; the technique-to-file table is `docs/design/handoff/slop-grade-city.md`.
+
+No Slop geodata is imported. Slop's README credits NYC Open Data and OpenStreetMap (ODbL) for its Manhattan data; none of it reaches this repo, so that notice does not carry over. The tile and its data notices above are unchanged.

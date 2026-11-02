@@ -6,7 +6,7 @@ import path from 'node:path';
 
 const BASE = process.env.BASE ?? 'http://127.0.0.1:3611';
 const PREFIX = process.env.BASE_PATH ?? '/nyc-mon';
-const ROUTES = ['/', '/mons', '/mons/hood-ratti', '/mons/bodega-cee', '/mons/yotes', '/city', '/how-it-works', '/story', '/get', '/legal/privacy', '/legal/terms', '/legal/childrens-privacy'];
+const ROUTES = ['/', '/mons', '/mons/hood-ratti', '/mons/bodega-cee', '/mons/yotes', '/mons/lanternfye', '/city', '/how-it-works', '/story', '/get', '/legal/privacy', '/legal/terms', '/legal/childrens-privacy'];
 const report = { base: BASE, prefix: PREFIX, checks: [], visual: 'NOT RUN', browserNavigation: 'NOT RUN' };
 const attrs = (text, key) => new RegExp(`\\b${key}="([^"]*)"`).exec(text)?.[1];
 const plain = (text) => text.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();

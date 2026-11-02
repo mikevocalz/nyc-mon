@@ -1,0 +1,16 @@
+diff --git a/dist/utils/is-api-error.mjs b/dist/utils/is-api-error.mjs
+index f255772042381b2cc83f03b4475a4899a086281f..a64f304da3a2baa30ff72ed5aea8d463c5af2a6b 100644
+--- a/dist/utils/is-api-error.mjs
++++ b/dist/utils/is-api-error.mjs
+@@ -2,7 +2,10 @@ import { APIError as APIError$1 } from "../error/index.mjs";
+ import { APIError } from "better-call";
+ //#region src/utils/is-api-error.ts
+ function isAPIError(error) {
+-	return error instanceof APIError || error instanceof APIError$1 || error?.name === "APIError";
++	// Name match only with a numeric statusCode: Payload's APIError is also
++	// named "APIError" but carries a numeric `status` and no `statusCode`, and
++	// rendering it as ours answers `200 <status>` with an empty body.
++	return error instanceof APIError || error instanceof APIError$1 || error?.name === "APIError" && typeof error.statusCode === "number";
+ }
+ //#endregion
+ export { isAPIError };

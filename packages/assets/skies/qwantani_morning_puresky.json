@@ -1,0 +1,144 @@
+{
+  "id": "qwantani_morning_puresky",
+  "kind": "nyc-mon/sky-lighting/v1",
+  "generatedAt": "2026-10-17T02:21:34.187Z",
+  "generatedBy": "packages/assets/skies/scripts/precompute-skies.mjs",
+  "source": {
+    "assetId": "qwantani_morning_puresky",
+    "assetName": "Qwantani Morning (Pure Sky)",
+    "authors": [
+      "Jarod Guest"
+    ],
+    "assetPage": "https://polyhaven.com/a/qwantani_morning_puresky",
+    "apiInfoUrl": "https://api.polyhaven.com/assets?t=hdris",
+    "fileUrl": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/qwantani_morning_puresky_2k.hdr",
+    "file": ".cache/qwantani_morning_puresky_2k.hdr",
+    "format": "Radiance RGBE .hdr (equirectangular)",
+    "resolution": "2k",
+    "width": 2048,
+    "height": 1024,
+    "sha256": "d8e603573f9e26d3e2783e0bbd136bfdb74f1ef7d8cf306365b7ab8fdfccbd07",
+    "md5": "87dfe2068bbf9ad2dc9b4ee1c95ce30c",
+    "fetchedAt": "2026-10-17T02:18:12.704Z",
+    "license": {
+      "code": "CC0-1.0",
+      "name": "Creative Commons Zero (public domain dedication)",
+      "url": "https://polyhaven.com/license",
+      "recordedAt": "2026-10-17T02:18:12.705Z"
+    }
+  },
+  "axes": "y-up right-handed world; dir = (sin(theta)*sin(phi), cos(theta), sin(theta)*cos(phi)), phi = 2*pi*u - pi so azimuth 0 faces +Z at the equirect image centre; azimuth increases toward +X. Azimuth is not compass-aligned.",
+  "sunDirection": [
+    0.552888,
+    0.34477,
+    0.758584
+  ],
+  "sunElevationDeg": 20.168,
+  "sunAzimuthDeg": 36.086,
+  "sunIrradiance": [
+    133962.957056,
+    110584.053171,
+    81402.451033
+  ],
+  "sunIrradianceHexNormalised": "#FFEACD",
+  "sunPeakRadiance": [
+    164864,
+    139264,
+    105472
+  ],
+  "sunClusterSolidAngleSr": 0.000053,
+  "sunClusterSpreadDeg": 0.219,
+  "skyIrradianceSH": [
+    [
+      12.24342,
+      11.511845,
+      10.693214
+    ],
+    [
+      6.563755,
+      5.685778,
+      4.491077
+    ],
+    [
+      3.782868,
+      3.332752,
+      2.864793
+    ],
+    [
+      9.048022,
+      7.837103,
+      6.183385
+    ],
+    [
+      1.637566,
+      1.364646,
+      1.029458
+    ],
+    [
+      2.245748,
+      1.871659,
+      1.412133
+    ],
+    [
+      -2.108921,
+      -1.878948,
+      -1.537927
+    ],
+    [
+      3.927695,
+      3.339747,
+      2.585916
+    ],
+    [
+      -1.265826,
+      -1.074875,
+      -0.828153
+    ]
+  ],
+  "shConvention": {
+    "basisOrder": [
+      "1",
+      "x",
+      "y",
+      "z",
+      "x*y",
+      "y*z",
+      "3*y*y-1",
+      "x*z",
+      "x*x-z*z"
+    ],
+    "axes": "y-up; 6th coefficient uses 3*y^2-1 and the last uses x^2-z^2",
+    "shConstants": {
+      "c0": 0.28209479177387814,
+      "c1": 0.4886025119029199,
+      "c2": 1.0925484305920792,
+      "c3": 0.31539156525252005,
+      "c4": 0.5462742152960396
+    },
+    "cosineLobe": {
+      "l0": 3.141592653589793,
+      "l1": 2.0943951023931953,
+      "l2": 0.7853981633974483,
+      "foldedIn": true
+    },
+    "reconstruct": "E(n) = sum_i skyIrradianceSH[i] * shConstant_i * basis_i(n)",
+    "reference": "Ramamoorthi & Hanrahan, SIGGRAPH 2001 (A_l = pi, 2pi/3, pi/4)",
+    "evalSH9Note": "packages/ui/three/cel/cel-shading.ts evalSH9 already folds A_l into SH_L0/L1/L2_* constants and uses z-up basis order [1, y, z, x, xy, yz, 3z^2-1, xz, x^2-y^2] with negated L1. To reuse it: divide these coefficients by cosineLobe per band to recover raw L_lm, feed (sh0,sh1,sh2,sh3) = (-L_y, -L_z, -L_x) per its sign convention, (sh4,sh5,sh6,sh7,sh8) = (L_xy, L_yz, L_3y2-1, L_xz, L_x2-z2), and evaluate with the normal swizzled n -> (x, z, y)."
+  },
+  "horizonColor": [
+    0.884911,
+    0.89995,
+    0.848347
+  ],
+  "horizonColorHexNormalised": "#FDFFF8",
+  "stats": {
+    "meanRadiance": [
+      1.09938,
+      1.03369,
+      0.960182
+    ],
+    "maxLuminance": 142266.7776,
+    "sunClusterPixels": 6,
+    "sunClusterThresholdLuminance": 71133.3888
+  }
+}

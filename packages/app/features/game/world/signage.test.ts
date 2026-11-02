@@ -92,3 +92,12 @@ test('the baked tile signs the Apollo corner of 125th Street', () => {
   assert.ok(nearest.includes('W 125 ST'), nearest.join(', '));
   for (const s of signs) for (const b of s.blades) assert.ok(b.length <= MAX_BLADE_LENGTH + 1e-9, b.text);
 });
+
+test('streetlights keep LIGHT_CORNER_CLEAR metres off every intersection', async () => {
+  const { findIntersections, placeStreetlights, LIGHT_CORNER_CLEAR } = await import('./signage.ts');
+  const tile = parseCityDataset(JSON.parse(readFileSync(new URL('../data/harlem-apollo.json', import.meta.url), 'utf8')));
+  const crosses = findIntersections(tile.roads);
+  const lights = placeStreetlights(tile.roads, [0, 0], 900, () => true, crosses);
+  assert.ok(lights.length > 50, `${lights.length} lights still stand`);
+  for (const l of lights) for (const c of crosses) assert.ok(Math.hypot(l.x - c.x, l.z - c.z) >= LIGHT_CORNER_CLEAR);
+});

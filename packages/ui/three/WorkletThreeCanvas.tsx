@@ -28,6 +28,7 @@ export function WorkletThreeCanvas<P>({
   className,
   opacity = 1,
   background,
+  androidSurfaceType,
   onBackendChange,
   children,
   ref,
@@ -101,7 +102,7 @@ export function WorkletThreeCanvas<P>({
   }, [running]);
 
   let surface = null;
-  if (live) surface = <ThreeSurface key={device ? 'shared' : 'own'} ref={surfaceRef} />;
+  if (live) surface = <ThreeSurface key={device ? 'shared' : 'own'} ref={surfaceRef} androidSurfaceType={androidSurfaceType} />;
   else if (!pending) surface = fallback;
 
   return (

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { createEmptySave } from '@acme/core/save';
+import { createEmptySave, lastGoodKey } from '@acme/core/save';
 import { createInitialCareState, resolveSceneMode } from '@acme/core/sim';
 import type { MonInstance, SaveCurrent } from '@acme/core/types';
 import type { KeyValueStorage } from '../onboarding/storage.types';
@@ -27,7 +27,8 @@ function memoryStorage(): KeyValueStorage & { readonly writes: number } {
   return {
     getString: (key) => values.get(key),
     set: (key, value) => {
-      writes += 1;
+      // Counts writes of the save itself; SaveIO's last-good backup (M22) is the same bytes under a second key.
+      if (key !== lastGoodKey(KEY)) writes += 1;
       values.set(key, value);
     },
     remove: (key) => {
@@ -48,6 +49,7 @@ function mon(id: string, speciesId: string): MonInstance {
     hatchedAt: T0,
     bond: 0,
     stage: 'Baby',
+    gender: null,
     voiceLineageId: null,
     originBlock: null,
     habitatTags: [],
@@ -150,7 +152,7 @@ describe('one Mon store', () => {
     assert.equal(calls, 0);
   });
 
-  it('holds no second persisted copy: the save key is the only key written', () => {
+  it('holds no second copy of state: only the save and its byte-identical last-good backup are written', () => {
     const storage = memoryStorage();
     const keys = new Set<string>();
     const spy: KeyValueStorage = { ...storage, set: (k, v) => (keys.add(k), storage.set(k, v)) };
@@ -159,7 +161,9 @@ describe('one Mon store', () => {
     const store = createMonStore(io);
     store.getState().hydrate();
     store.getState().applyCare({ kind: 'wake' }, T0 + 1);
-    assert.deepEqual([...keys], [KEY]);
+    assert.deepEqual([...keys], [KEY, lastGoodKey(KEY)]);
+    // The backup never diverges from the save: it is the same bytes, not a second store.
+    assert.equal(storage.getString(lastGoodKey(KEY)), storage.getString(KEY));
   });
 });
 
@@ -257,7 +261,8 @@ describe('selectors', () => {
 
 describe('model slots', () => {
   it('ship one empty slot per bloodline × stage', () => {
-    assert.equal(MON_MODEL_SLOTS.length, 3 * 5);
+    assert.equal(MON_MODEL_SLOTS.length, 4 * 5);
+    assert.deepEqual([...new Set(MON_MODEL_SLOTS.map((slot) => slot.bloodlineId))], ['F01', 'F02', 'F12', 'F04']);
     for (const slot of MON_MODEL_SLOTS) {
       assert.equal(slot.glbUri, null);
       assert.ok(Object.values(slot.clips).every((clip) => clip === null));

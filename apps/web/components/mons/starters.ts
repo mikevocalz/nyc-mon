@@ -3,13 +3,14 @@ import { starterCards, type StarterCard } from '../home/StartersSection';
 
 /**
  * The W02 route segment for each starter. Stable URL ids keyed by the
- * roster's BloodlineId (the mon file names: hood-ratti, bodega-cee, yotes) —
+ * roster's BloodlineId (the mon file names: hood-ratti, bodega-cee, yotes, lanternfye) —
  * not derived from `bloodlineName`, which is prose ("Bodega Baddiee Cee").
  */
 const SLUG_BY_BLOODLINE_ID: Readonly<Record<string, string>> = {
   F01: 'hood-ratti',
   F02: 'bodega-cee',
   F12: 'yotes',
+  F04: 'lanternfye',
 };
 
 /**
@@ -43,7 +44,7 @@ export function slugFor(card: Pick<StarterCard, 'key'>): string {
   return slug;
 }
 
-/** The three starters in slot order, each with its slug and Egg → Baby line. */
+/** The four starters in slot order, each with its slug and Egg → Baby line. */
 export function monsStarters(): readonly MonsStarter[] {
   const cards = starterCards();
   return starterBloodlines.map((starter) => {

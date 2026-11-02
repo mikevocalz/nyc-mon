@@ -29,15 +29,34 @@ export function isAccessibilityTextSize(fontScale: number): boolean {
 }
 
 /**
- * M10 ring diameter: `min(screenW − 64, 260)` on phones, up to 300 on tablet
- * portrait and 360 in a landscape window (M10 handoff "Layout"), never under
- * the 3 × 48 dp the stops need.
+ * The H-Lynk screen is never wider than 440 pt of body on a phone, so its
+ * content area stays under this. Wider content means a tablet-sized shell
+ * (the body grows toward 600 pt on an iPad: Decision H-1).
+ */
+export const TABLET_SCREEN_MIN_DP = 440;
+/** Largest ring on a tablet-sized H-Lynk screen. */
+export const RING_TABLET_MAX_DP = 420;
+
+/**
+ * Stacked ring cap: 260 on phones (M10 handoff "Layout"); on a tablet-sized
+ * screen it grows with the screen to 70 % of its width, at least 300 and at
+ * most {@linkcode RING_TABLET_MAX_DP}. The old "300 from 600 wide" rule never
+ * fired: the content area inside a 600 pt body is under 600.
+ */
+function stackRingCap(widthDp: number): number {
+  if (widthDp < TABLET_SCREEN_MIN_DP) return 260;
+  return Math.max(300, Math.min(RING_TABLET_MAX_DP, Math.round(widthDp * 0.7)));
+}
+
+/**
+ * M10 ring diameter: `min(screenW − 64, 260)` on phones, growing with a
+ * tablet-sized screen (see `stackRingCap`), and up to 360 in a landscape
+ * window (M10 handoff "Layout"), never under the 3 × 48 dp the stops need.
  */
 export function ringSizeDp(widthDp: number, heightDp: number): number {
   const landscape = isLandscapeWindow(widthDp, heightDp);
   if (landscape) return Math.max(144, Math.min(360, heightDp - 280, widthDp / 2 - 48));
-  const cap = widthDp >= 600 ? 300 : 260;
-  return Math.max(144, Math.min(cap, widthDp - 64));
+  return Math.max(144, Math.min(stackRingCap(widthDp), widthDp - 64));
 }
 
 /** The smallest ring the three 48 dp stops fit on (3 × 48). */
@@ -68,10 +87,10 @@ export interface IncubateFitParts {
   widthDp: number;
 }
 
-/** Ring cap: 260 on phones, 300 once the screen is 600 wide, 360 beside the text (M10 handoff "Layout"). */
+/** Ring cap: 260 on phones, growing on a tablet-sized screen, 360 beside the text (M10 handoff "Layout"). */
 function ringCap(widthDp: number, side: boolean): number {
   if (side) return 360;
-  return widthDp >= 600 ? 300 : 260;
+  return stackRingCap(widthDp);
 }
 
 /**
@@ -122,6 +141,12 @@ export interface MeetFitParts {
   actionsShown: boolean;
   fontScale: number;
 }
+
+/**
+ * Widest triptych in a landscape H-Lynk screen: three 300 dp tiles and two
+ * 12 dp gaps, so the tiles never stretch across a wide compact screen.
+ */
+export const TRIPTYCH_LANDSCAPE_MAX_DP = 3 * 300 + 2 * 12;
 
 /**
  * Smallest triptych height: a 48 dp tap row plus the egg still above it.

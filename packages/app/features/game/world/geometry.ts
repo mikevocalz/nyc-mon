@@ -35,20 +35,40 @@ export function hashUnit(id: string): number {
 }
 
 /**
- * Non-indexed triangles with position, normal, colour and uv, in typed
- * arrays that double as they fill. The city writes about a million
- * vertices at scene build; `number[]` pushes and the copy into
- * Float32BufferAttribute were most of the build time (and on Hermes, which
- * has no JIT, far more), so this writes floats in place and hands three
- * one exact-length copy. Bounds are tracked as it goes, so toGeometry sets
- * the bounding sphere without another pass.
+ * Non-indexed triangles with position, normal, colour, uv and surface
+ * (aRoughMetal vec2 + aOcclusion float) in typed arrays that double as they
+ * fill. The city writes about a million vertices at scene build; `number[]`
+ * pushes and the copy into Float32BufferAttribute were most of the build
+ * time (and on Hermes, which has no JIT, far more), so this writes floats
+ * in place and hands three one exact-length copy. Bounds are tracked as it
+ * goes, so toGeometry sets the bounding sphere without another pass.
+ *
+ * Surface layout: roughness and metalness travel together because the PBR
+ * material always reads them as a pair, in one vec2 attribute rather than
+ * two floats (same bytes, half the attribute slots); occlusion is a
+ * separate float because it is a different concern — it varies per corner
+ * of a quad (contact-shadow falloff) while roughness/metalness change per
+ * emitted part. Emitters stamp the current pair with `surface()`; `ao` may
+ * be overridden per vertex like uv. The attributes are written into every
+ * geometry regardless of material so the flagged PBR path can read them
+ * anywhere; basic materials ignore them (3 extra floats per vertex).
  */
 export class VertexBuffer {
   private pos: Float32Array;
   private nor: Float32Array;
   private col: Float32Array;
   private tex: Float32Array;
+  private rm: Float32Array;
+  private occ: Float32Array;
+  private fac: Float32Array;
   private count = 0;
+  /** Stamped on every vertex until the next `surface()` call; dullest default so a missed write never shines. */
+  private curRough = 0.95;
+  private curMetal = 0;
+  private curAo = 1;
+  /** vd lane wall photo [layer, 1 / tile metres]; layer -1 means none. */
+  private curFacade0 = -1;
+  private curFacade1 = 0;
 
   /** `capacity` in vertices: the big city buffers pass a size near their final one to skip regrowth. */
   constructor(capacity = 1024) {
@@ -57,6 +77,9 @@ export class VertexBuffer {
     this.nor = new Float32Array(3 * n);
     this.col = new Float32Array(3 * n);
     this.tex = new Float32Array(2 * n);
+    this.rm = new Float32Array(2 * n);
+    this.occ = new Float32Array(n);
+    this.fac = new Float32Array(2 * n);
   }
   private minX = Infinity; private minY = Infinity; private minZ = Infinity;
   private maxX = -Infinity; private maxY = -Infinity; private maxZ = -Infinity;
@@ -70,13 +93,30 @@ export class VertexBuffer {
   get normals(): Float32Array { return this.nor.subarray(0, this.count * 3); }
   get colors(): Float32Array { return this.col.subarray(0, this.count * 3); }
   get uvs(): Float32Array { return this.tex.subarray(0, this.count * 2); }
+  /** Interleaved [roughness, metalness] pairs. */
+  get roughMetals(): Float32Array { return this.rm.subarray(0, this.count * 2); }
+  get occlusions(): Float32Array { return this.occ.subarray(0, this.count); }
+
+  /** Roughness/metalness (and default occlusion) stamped on vertices until the next call. */
+  surface(roughness: number, metalness: number, ao = 1): void {
+    this.curRough = roughness;
+    this.curMetal = metalness;
+    this.curAo = ao;
+  }
+
+  /** Wall photo layer and its tile rate, stamped until the next call (vd-materials.ts reads `aFacade`). */
+  facade(layer: number, perMetre: number): void {
+    this.curFacade0 = layer;
+    this.curFacade1 = perMetre;
+  }
 
   private grow(): void {
     const next = (a: Float32Array) => { const b = new Float32Array(a.length * 2); b.set(a); return b; };
     this.pos = next(this.pos); this.nor = next(this.nor); this.col = next(this.col); this.tex = next(this.tex);
+    this.rm = next(this.rm); this.occ = next(this.occ); this.fac = next(this.fac);
   }
 
-  vertex(x: number, y: number, z: number, nx: number, ny: number, nz: number, rgb: readonly number[], u = 0, v = 0): void {
+  vertex(x: number, y: number, z: number, nx: number, ny: number, nz: number, rgb: readonly number[], u = 0, v = 0, ao?: number): void {
     if ((this.count + 1) * 3 > this.pos.length) this.grow();
     const i = this.count * 3;
     const p = this.pos; const n = this.nor; const c = this.col;
@@ -85,25 +125,28 @@ export class VertexBuffer {
     c[i] = rgb[0]!; c[i + 1] = rgb[1]!; c[i + 2] = rgb[2]!;
     const t = this.count * 2;
     this.tex[t] = u; this.tex[t + 1] = v;
+    this.rm[t] = this.curRough; this.rm[t + 1] = this.curMetal;
+    this.fac[t] = this.curFacade0; this.fac[t + 1] = this.curFacade1;
+    this.occ[this.count] = ao ?? this.curAo;
     this.count++;
     if (x < this.minX) this.minX = x; if (x > this.maxX) this.maxX = x;
     if (y < this.minY) this.minY = y; if (y > this.maxY) this.maxY = y;
     if (z < this.minZ) this.minZ = z; if (z > this.maxZ) this.maxZ = z;
   }
 
-  /** Quad a-b-c-d (counter-clockwise seen from the normal side) as two triangles. */
+  /** Quad a-b-c-d (counter-clockwise seen from the normal side) as two triangles. `ao` gives per-corner occlusion, like `uv`. */
   quad(
     a: readonly number[], b: readonly number[], c: readonly number[], d: readonly number[],
-    n: readonly number[], rgb: readonly number[], uv?: readonly (readonly number[])[],
+    n: readonly number[], rgb: readonly number[], uv?: readonly (readonly number[])[], ao?: readonly number[],
   ): void {
     const nx = n[0]!; const ny = n[1]!; const nz = n[2]!;
     const ua = uv?.[0]; const ub = uv?.[1]; const uc = uv?.[2]; const ud = uv?.[3];
-    this.vertex(a[0]!, a[1]!, a[2]!, nx, ny, nz, rgb, ua?.[0] ?? 0, ua?.[1] ?? 0);
-    this.vertex(b[0]!, b[1]!, b[2]!, nx, ny, nz, rgb, ub?.[0] ?? 0, ub?.[1] ?? 0);
-    this.vertex(c[0]!, c[1]!, c[2]!, nx, ny, nz, rgb, uc?.[0] ?? 0, uc?.[1] ?? 0);
-    this.vertex(a[0]!, a[1]!, a[2]!, nx, ny, nz, rgb, ua?.[0] ?? 0, ua?.[1] ?? 0);
-    this.vertex(c[0]!, c[1]!, c[2]!, nx, ny, nz, rgb, uc?.[0] ?? 0, uc?.[1] ?? 0);
-    this.vertex(d[0]!, d[1]!, d[2]!, nx, ny, nz, rgb, ud?.[0] ?? 0, ud?.[1] ?? 0);
+    this.vertex(a[0]!, a[1]!, a[2]!, nx, ny, nz, rgb, ua?.[0] ?? 0, ua?.[1] ?? 0, ao?.[0]);
+    this.vertex(b[0]!, b[1]!, b[2]!, nx, ny, nz, rgb, ub?.[0] ?? 0, ub?.[1] ?? 0, ao?.[1]);
+    this.vertex(c[0]!, c[1]!, c[2]!, nx, ny, nz, rgb, uc?.[0] ?? 0, uc?.[1] ?? 0, ao?.[2]);
+    this.vertex(a[0]!, a[1]!, a[2]!, nx, ny, nz, rgb, ua?.[0] ?? 0, ua?.[1] ?? 0, ao?.[0]);
+    this.vertex(c[0]!, c[1]!, c[2]!, nx, ny, nz, rgb, uc?.[0] ?? 0, uc?.[1] ?? 0, ao?.[2]);
+    this.vertex(d[0]!, d[1]!, d[2]!, nx, ny, nz, rgb, ud?.[0] ?? 0, ud?.[1] ?? 0, ao?.[3]);
   }
 
   toGeometry(THREE: Three): BufferGeometry {
@@ -113,6 +156,9 @@ export class VertexBuffer {
     geometry.setAttribute('normal', new THREE.BufferAttribute(this.nor.slice(0, n * 3), 3));
     geometry.setAttribute('color', new THREE.BufferAttribute(this.col.slice(0, n * 3), 3));
     geometry.setAttribute('uv', new THREE.BufferAttribute(this.tex.slice(0, n * 2), 2));
+    geometry.setAttribute('aRoughMetal', new THREE.BufferAttribute(this.rm.slice(0, n * 2), 2));
+    geometry.setAttribute('aOcclusion', new THREE.BufferAttribute(this.occ.slice(0, n), 1));
+    geometry.setAttribute('aFacade', new THREE.BufferAttribute(this.fac.slice(0, n * 2), 2));
     if (n > 0) {
       // The box's circumsphere: a little larger than three's fit, and no extra pass over the vertices.
       const centre = new THREE.Vector3((this.minX + this.maxX) / 2, (this.minY + this.maxY) / 2, (this.minZ + this.maxZ) / 2);
