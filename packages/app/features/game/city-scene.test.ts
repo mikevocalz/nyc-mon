@@ -7,7 +7,7 @@ import { parseCityDataset } from './city-dataset.ts';
 import { syntheticTileV2 as fixtureV2 } from './world/synthetic-tile.ts';
 import type { SceneActorFactory } from './scene-actor.ts';
 
-const frame = (delta = 0) => ({ delta, time: 0, reducedMotion: false } as unknown as ThreeFrame);
+const frame = (delta = 0, reducedMotion = false) => ({ delta, time: 0, reducedMotion } as unknown as ThreeFrame);
 function context(invalidations = { count: 0 }) {
   // Scene construction does not create a GPU renderer.
   return { THREE, invalidate: () => { invalidations.count++; } } as unknown as ThreeContext;
@@ -131,4 +131,96 @@ test('disposes every geometry and material exactly once', () => {
 test('rejects invalid cameras before allocating meshes', () => {
   const input = params(); input.camera.x = Number.NaN;
   assert.throws(() => createCityScene(context(), input), /camera/);
+});
+
+test('a Klipp shot lands through the rig, follows its own look point, and hands back to the chase camera', () => {
+  const input = params();
+  const invalidations = { count: 0 };
+  const built = createCityScene(context(invalidations), input);
+  const camera = built.camera as THREE.PerspectiveCamera;
+  const before = camera.position.clone();
+  const originalFogDensity = built.scene.fog instanceof THREE.FogExp2 ? built.scene.fog.density : null;
+  const shot = {
+    position: [55, 4, 32] as [number, number, number],
+    quaternion: [0, 0, 0, 1] as [number, number, number, number],
+    near: .2, far: 2000, fov: 60,
+    lookAt: [0, 1, 0] as [number, number, number],
+  };
+  // Blends advance on real time; dt 1 lands the shot blend in one frame.
+  built.update!(frame(1), { ...input, cinematicShot: shot });
+  assert.deepEqual(camera.position.toArray(), [55, 4, 32]);
+  assert.equal(camera.fov, 60);
+  // Legacy linear fog follows look distance. Physical/sky-rig exponential
+  // fog instead preserves its authored density when the camera changes.
+  const fog = built.scene.fog;
+  const shotDistance = Math.hypot(55 - 0, 4 - 1, 32 - 0);
+  if (fog instanceof THREE.Fog) {
+    assert.ok(Math.abs(fog.near - (shotDistance * 1.4 + 250)) < 1e-6, `fog.near ${fog.near}`);
+  } else {
+    assert.ok(fog instanceof THREE.FogExp2);
+    assert.equal(fog.density, originalFogDensity);
+  }
+  built.update!(frame(1), { ...input, cinematicShot: null });
+  assert.ok(camera.position.equals(before), 'the blend lands back on the chase pose');
+  assert.equal(camera.fov, 50);
+  built.dispose?.();
+});
+
+test('an out-of-range shot clamps its lens mid-flight; reduced motion cuts', () => {
+  const input = params();
+  const built = createCityScene(context(), input);
+  const camera = built.camera as THREE.PerspectiveCamera;
+  const telephoto = {
+    position: [55, 4, 32] as [number, number, number],
+    quaternion: [0, 0, 0, 1] as [number, number, number, number],
+    near: .2, far: 2000, fov: 8,
+  };
+  built.update!(frame(1), { ...input, cinematicShot: telephoto });
+  assert.deepEqual(camera.position.toArray(), [55, 4, 32]);
+  assert.equal(camera.fov, 20, 'clamped into the lens range instead of rejected');
+  built.update!(frame(1), { ...input, cinematicShot: null });
+  const still = {
+    position: [1, 200, 60] as [number, number, number],
+    quaternion: [0, 0, 0, 1] as [number, number, number, number],
+    near: .2, far: 2000, fov: 60,
+  };
+  built.update!(frame(0, true), { ...input, cinematicShot: still });
+  assert.deepEqual(camera.position.toArray(), [1, 200, 60], 'reduced motion: the shot cuts in one frame');
+  built.dispose?.();
+});
+
+test('a held shot stays in world space across repeated frames and origin rebases, then returns to chase', () => {
+  const input = params();
+  input.camera.x = 49000;
+  input.camera.z = -49000;
+  const built = createCityScene(context(), input);
+  const shot = {
+    position: [49055, 4, -48968] as [number, number, number],
+    quaternion: [0, 0, 0, 1] as [number, number, number, number],
+    near: 0.2, far: 2000, fov: 60,
+    lookAt: [49000, 1, -49000] as [number, number, number],
+  };
+  const root = built.scene.children[0]!;
+  const assertShot = () => {
+    assert.deepEqual(built.camera.position.toArray(), [
+      shot.position[0] + root.position.x, shot.position[1], shot.position[2] + root.position.z,
+    ]);
+    const sky = built.scene.getObjectByName('city:sky')!;
+    assert.deepEqual(sky.position.toArray(), shot.position);
+  };
+  built.update!(frame(1), { ...input, cinematicShot: shot });
+  assertShot();
+  for (let i = 0; i < 3; i++) {
+    built.update!(frame(0), { ...input, cinematicShot: shot });
+    assertShot();
+  }
+  const moved = { ...input, camera: { ...input.camera, x: 50000, z: -50000 } };
+  built.update!(frame(0), { ...moved, cinematicShot: shot });
+  assertShot();
+  built.update!(frame(1), { ...moved, cinematicShot: null });
+  const chase = cameraPose(moved.camera);
+  assert.deepEqual(built.camera.position.toArray(), [
+    chase.position[0] + root.position.x, chase.position[1], chase.position[2] + root.position.z,
+  ]);
+  built.dispose?.();
 });
