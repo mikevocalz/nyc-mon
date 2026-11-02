@@ -1,4 +1,5 @@
 'use client';
+import type { ComponentProps } from 'react';
 import Animated from 'react-native-reanimated';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { css } from './html/css';
@@ -19,7 +20,11 @@ import { css } from './html/css';
  * Lives in the kit so screens compose it from `@acme/ui` rather than importing
  * the library, matching every other primitive here.
  */
-export const KeyboardAwareScroll = css(
+const StyledKeyboardAwareScroll = css(
   Animated.createAnimatedComponent(KeyboardAwareScrollView),
   'KeyboardAwareScroll',
 );
+
+export function KeyboardAwareScroll(props: ComponentProps<typeof StyledKeyboardAwareScroll>) {
+  return <StyledKeyboardAwareScroll {...props} showsHorizontalScrollIndicator={false} showsVerticalScrollIndicator={false} />;
+}

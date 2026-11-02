@@ -85,11 +85,15 @@ export const Pressable = css(ButtonBase, 'Pressable');
 export const TextInput = css(InputBase, 'TextInput');
 
 // Behavioral, not semantic — RNW renders an overflow <div>.
-export const ScrollView = css(RNScrollView, 'ScrollView', {
+const StyledScrollView = css(RNScrollView, 'ScrollView', {
   contentContainerClassName: 'contentContainerStyle',
 }) as React.FC<
   React.ComponentProps<typeof RNScrollView> & CN & { contentContainerClassName?: string }
 >;
+
+export const ScrollView: typeof StyledScrollView = (props) => (
+  <StyledScrollView {...props} showsHorizontalScrollIndicator={false} showsVerticalScrollIndicator={false} />
+);
 
 // ---- semantic landmarks (@expo/html-elements) --------------------------------
 // Real HTML landmarks on web, correct accessibility roles on native.

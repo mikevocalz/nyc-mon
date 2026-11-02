@@ -44,7 +44,7 @@ export function DrawerContent(props: DrawerContentComponentProps) {
     href === '/(home)' ? pathname === '/' || pathname === '' : pathname.startsWith(href);
 
   return (
-    <DrawerContentScrollView {...props} showsVerticalScrollIndicator={false}>
+    <DrawerContentScrollView {...props} showsHorizontalScrollIndicator={false} showsVerticalScrollIndicator={false}>
       {/* Identity block. The 2px rule and the raised slab match every other
           bordered surface in the app; the old hairline was the only 1px border
           in the drawer and read as an unfinished divider. */}
