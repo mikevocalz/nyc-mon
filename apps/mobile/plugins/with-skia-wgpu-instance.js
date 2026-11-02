@@ -23,14 +23,33 @@ function addForcedSymbol(flags) {
   return list;
 }
 
+const APPLICATION = '"com.apple.product-type.application"';
+
+/**
+ * Build configuration ids of the app targets only. An app extension (the
+ * keychain widget) links no Skia, and `-u` on a symbol nothing defines fails
+ * that link, so extensions are left alone.
+ * @param {any} project an `xcode` project
+ * @returns {Set<string>}
+ */
+function appConfigurationIds(project) {
+  const ids = new Set();
+  const lists = project.pbxXCConfigurationList();
+  for (const [key, target] of Object.entries(project.pbxNativeTargetSection())) {
+    if (key.endsWith('_comment') || typeof target !== 'object' || target.productType !== APPLICATION) continue;
+    for (const ref of lists[target.buildConfigurationList]?.buildConfigurations ?? []) ids.add(ref.value);
+  }
+  return ids;
+}
+
 /** @type {import('expo/config-plugins').ConfigPlugin} */
 const withSkiaWgpuInstance = (config) =>
   withXcodeProject(config, (mod) => {
+    const appConfigs = appConfigurationIds(mod.modResults);
     const configurations = mod.modResults.pbxXCBuildConfigurationSection();
-    for (const entry of Object.values(configurations)) {
+    for (const [id, entry] of Object.entries(configurations)) {
       const settings = entry?.buildSettings;
-      // App and extension targets carry an Info.plist; the project-level configurations do not.
-      if (!settings?.INFOPLIST_FILE) continue;
+      if (!appConfigs.has(id) || !settings) continue;
       settings.OTHER_LDFLAGS = addForcedSymbol(settings.OTHER_LDFLAGS);
     }
     return mod;
@@ -39,3 +58,4 @@ const withSkiaWgpuInstance = (config) =>
 module.exports = withSkiaWgpuInstance;
 module.exports.addForcedSymbol = addForcedSymbol;
 module.exports.FORCE_SYMBOL = FORCE_SYMBOL;
+module.exports.appConfigurationIds = appConfigurationIds;

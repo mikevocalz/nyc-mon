@@ -63,6 +63,7 @@ import { gameCameraStore, gameScreenActions, gameScreenStore } from './game-sess
 import { resolveGameViewState, shouldMountCanvas } from './game-status.ts';
 import { resolveGameHudLayout } from './hud-layout.ts';
 import { loadGameScene, type GameSceneParams } from './load-game-scene.ts';
+import { cinematicCameraStore } from './camera/cinematic-camera.store.ts';
 import { CITY_FRAME_SINK_ENABLED, onCityFrame } from './perf/on-city-frame.ts';
 import { GAME_SURFACE_TYPE } from './perf/surface-type.ts';
 import { GAME_FREERUN } from './perf/frame-pacing.ts';
@@ -167,6 +168,8 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
 
   // Camera -> one redraw, outside React render (no per-event re-render of ThreeCanvas).
   useEffect(() => gameCameraStore.subscribe(() => canvas.current?.invalidate()), []);
+  // Battle/encounter camera shot changes redraw only the scene, never React.
+  useEffect(() => cinematicCameraStore.subscribe(() => canvas.current?.invalidate()), []);
   // The Caller moving (a jump in place moves no camera) -> one redraw, outside React render.
   useEffect(() => callerStore.subscribe(() => canvas.current?.invalidate()), []);
   // A new time-of-day pick -> one redraw; city-scene re-lights from params.preset in that frame.
@@ -208,6 +211,7 @@ export function GameScreen({ focused = true }: GameScreenProps = {}) {
     return {
       dataset: city.dataset,
       get camera() { return gameCameraStore.getState().camera; },
+      get cinematicShot() { return cinematicCameraStore.getState().shot; },
       // PR05/PR06 Living City (EXPO_PUBLIC_LIVING_CITY=1, default off): the
       // flag contributes the vehicle + pedestrian factories; off, the list is
       // byte-identical.

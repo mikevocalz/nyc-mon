@@ -22,3 +22,8 @@ export async function removeEventIntegrations(_params: {
   calendarEventId?: string;
   notificationId?: string;
 }): Promise<void> {}
+
+/** Web has no local notifications, so there is nothing to cancel. */
+export async function cancelLegacyMealReminders(): Promise<number> {
+  return 0;
+}

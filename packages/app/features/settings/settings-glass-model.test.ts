@@ -140,3 +140,13 @@ test('rows: no Egg alerts row where notifications are unsupported; a blocked OS 
   assert.equal(row!.id, 'notify');
   assert.equal(row!.verb, 'Open phone Settings');
 });
+
+test('rows: Mon calls sits after Egg alerts, says On or Off, and opens Settings when the OS blocks alerts', () => {
+  const rows = settingsRows({ callerName: null, theme: 'dark', timeOfDay: null, notify: true, monCalls: false });
+  assert.deepEqual(rows.slice(0, 2).map((r) => r.id), ['notify', 'monCalls']);
+  assert.equal(rowText(rows[1]!), 'Mon calls · Off');
+  assert.equal(rows[1]!.hint, 'An alert when your Mon needs food, rest, play, medicine or bedtime. Never while paused.');
+  const blocked = settingsRows({ callerName: null, theme: 'dark', timeOfDay: null, notify: false, monCalls: false, notifyDenied: true });
+  assert.equal(blocked.find((r) => r.id === 'monCalls')!.verb, 'Open phone Settings');
+  assert.ok(!settingsRows({ callerName: null, theme: 'dark', timeOfDay: null, monCalls: null }).some((r) => r.id === 'monCalls'));
+});

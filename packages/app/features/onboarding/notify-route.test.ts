@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { createDeepLinkStore, DEFAULT_ACTION_IDENTIFIER, readyLinkFromResponse, SEEN_KEY_LIMIT, type ResponseLike } from './notify-route.ts';
+import {
+  appLinkFromResponse, careLinkFromResponse, createDeepLinkStore, DEFAULT_ACTION_IDENTIFIER, readyLinkFromResponse, SEEN_KEY_LIMIT,
+  type ResponseLike,
+} from './notify-route.ts';
 
 function response(data: unknown, overrides: Partial<{ action: string; id: string; date: number }> = {}): ResponseLike {
   return {
@@ -105,5 +108,48 @@ describe('deep-link store (M01 holds the link until boot resolves)', () => {
     assert.equal(s.receive(link('x@5')), 'navigate');
     assert.equal(s.receive(link('x@5')), 'duplicate');
     assert.equal(s.receive(link('y@6')), 'navigate');
+  });
+});
+
+describe('care-call taps (Mon Space)', () => {
+  const careResponse = (data: unknown, action = DEFAULT_ACTION_IDENTIFIER): ResponseLike => ({
+    actionIdentifier: action,
+    notification: { date: 42, request: { identifier: 'mon-care:m1:hunger:0', content: { data } } },
+  });
+  const payload = { kind: 'mon-care-call', monInstanceId: 'm1', callKind: 'hunger', at: 41, url: '/mon-space' };
+
+  it('routes a tap on a care call to Mon Space with the Mon named', () => {
+    const result = careLinkFromResponse(careResponse(payload));
+    assert.deepEqual(result, { ok: true, link: { pathname: '/mon-space', params: { monId: 'm1' }, key: 'mon-care:m1:hunger:0@42' } });
+  });
+
+  it('ignores a dismiss and a foreign payload', () => {
+    assert.equal(careLinkFromResponse(careResponse(payload, 'expo.modules.notifications.actions.DISMISS')).ok, false);
+    assert.equal(careLinkFromResponse(careResponse({ eggId: 'e' })).ok, false);
+  });
+
+  it('appLinkFromResponse picks whichever link the payload carries', () => {
+    const care = appLinkFromResponse(careResponse(payload));
+    assert.equal(care.ok && care.link.pathname, '/mon-space');
+    const egg = appLinkFromResponse(careResponse({ eggId: 'egg-1', url: '/(home)/hatch' }));
+    assert.equal(egg.ok && egg.link.pathname, '/(home)/hatch');
+    assert.equal(appLinkFromResponse(careResponse({ nope: true })).ok, false);
+  });
+
+  it('a care tap while Mon Space already shows that Mon pushes nothing', () => {
+    const s = createDeepLinkStore();
+    s.resolveBoot('companion');
+    const result = careLinkFromResponse(careResponse(payload));
+    assert.ok(result.ok);
+    assert.equal(s.receive(result.link, { pathname: '/mon-space', monId: 'm1' }), 'already-there');
+  });
+
+  it('a care tap held through boot is armed for a companion route', () => {
+    const s = createDeepLinkStore();
+    const result = careLinkFromResponse(careResponse(payload));
+    assert.ok(result.ok);
+    assert.equal(s.receive(result.link), 'held');
+    s.resolveBoot('companion');
+    assert.deepEqual(s.takeArmed(), result.link);
   });
 });

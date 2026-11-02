@@ -325,6 +325,9 @@ export function BookingForm({ onDone, onOpenEditorSettings }: BookingFormProps) 
         <Section className="gap-2">
           <Text className="text-sm font-medium text-text">Reminders & sync</Text>
           <View className="flex-row flex-wrap gap-2">
+            {/* Meals get no phone reminder: the Mon calls for food itself
+                (reminder-policy.ts), so the toggle would do nothing. */}
+            {isMealKind(selectedKind) ? null : (
             <Pressable
               onPress={() => setRemindersEnabled(!remindersEnabled)}
               accessibilityState={{ selected: remindersEnabled }}
@@ -334,6 +337,7 @@ export function BookingForm({ onDone, onOpenEditorSettings }: BookingFormProps) 
                 Reminders {remindersEnabled ? 'On' : 'Off'}
               </Text>
             </Pressable>
+            )}
             <Pressable
               onPress={() => setSyncPersonalCalendar(!syncPersonalCalendar)}
               accessibilityState={{ selected: syncPersonalCalendar }}

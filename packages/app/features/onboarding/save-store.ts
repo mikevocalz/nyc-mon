@@ -5,6 +5,7 @@ import type { CallerProfile, SaveCurrent } from '@acme/core/types';
 import { SAVE_KEY } from './onboarding.store';
 import { createSaveIO, type SaveIO } from './save-io';
 import { saveStorage } from './storage';
+import { bindFreshCareCaller, careLinkTarget, recordFreshCareSave, verifyCurrentCareOwner } from '../mon-space/care-surface-owner.ts';
 
 /** The one binding of the save codec to MMKV `nyc-mon-save`. The Mon store writes through this too. */
 export const saveIO: SaveIO = createSaveIO(saveStorage, SAVE_KEY);
@@ -15,6 +16,15 @@ export const saveIO: SaveIO = createSaveIO(saveStorage, SAVE_KEY);
  */
 export function readSave(): SaveCurrent | undefined {
   return saveIO.read();
+}
+
+/** Used by direct widget links; storage's platform fork stays inside this package. */
+export function currentCareLinkTarget(authUserId: string | null) {
+  return careLinkTarget(saveStorage, readSave(), authUserId);
+}
+
+export function verifyCareLinkOwner(authUserId: string, deps: Parameters<typeof verifyCurrentCareOwner>[3]) {
+  return verifyCurrentCareOwner(saveStorage, readSave, authUserId, deps);
 }
 
 /** Persists a save back to the single MMKV value. */
@@ -44,7 +54,11 @@ export function deviceId(): string {
  * player back to sign-in, which routes home to `restore` again.
  */
 export function startSaveForNewAccount(nowMs: number): void {
-  if (readSave() === undefined) writeSave(createEmptySave(deviceId(), nowMs));
+  if (readSave() === undefined) {
+    const fresh = createEmptySave(deviceId(), nowMs);
+    recordFreshCareSave(saveStorage, fresh);
+    writeSave(fresh);
+  }
 }
 
 /**
@@ -64,8 +78,9 @@ export function renameCaller(callerName: string, nowMs: number): SaveCurrent | u
   return next;
 }
 
-export function storeCallerProfile(caller: CallerProfile, nowMs: number): SaveCurrent {
+export function storeCallerProfile(caller: CallerProfile, nowMs: number, authUserId?: string): SaveCurrent {
   const save = readSave() ?? createEmptySave(deviceId(), nowMs);
+  if (authUserId) bindFreshCareCaller(saveStorage, save, caller, authUserId);
   const next: SaveCurrent = { ...save, caller, savedAt: nowMs };
   writeSave(next);
   return next;

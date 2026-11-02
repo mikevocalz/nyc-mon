@@ -8,6 +8,7 @@ import type { ThreeContext, ThreeScene } from '@acme/ui/three';
 import type { CityDatasetV3 } from './city-dataset.ts';
 import type { ActorFrame, SceneActor, SceneActorFactory } from './scene-actor.ts';
 import { prepareCityWorld } from './world/index.ts';
+import { createKlippShotRig, type KlippCameraShot } from './camera/klipp-shot-bridge.ts';
 import { shadowSafeCasters } from './world/vd-port/shared/shadow-safe.ts';
 import { cityCompilePass, type CompilePass } from './compile-pass.ts';
 import { EXPERIMENTAL_WORLD_POST, mountCityPostPipeline, resolvePostOptions } from './post/pipeline.ts';
@@ -53,6 +54,8 @@ export interface CityCamera {
 export interface CitySceneParams {
   dataset: CityDatasetV3;
   camera: CityCamera;
+  /** Optional shot output for the Klipp rig; no change to the saved player camera. */
+  cinematicShot?: KlippCameraShot | null;
   /** Created once from the first params with the scene's THREE; later changes need a remount, like the dataset. */
   actors?: readonly SceneActorFactory[];
   /** L1 sky pick (morning/dusk/night) — only read when the sky rig flag is on. */
@@ -190,6 +193,10 @@ function* prepareCityScene(context: ThreeContext, initial: CitySceneParams): Gen
     }
   };
   try {
+    // Klipp owns camera orientation/lens and blends authored shots with the
+    // unobstructed chase pose. Register it before subsequent scene allocation.
+    const shots = createKlippShotRig(camera);
+    owned.push(() => shots.dispose());
     renderRoot.add(world.sky, world.group);
     scene.fog = world.fog;
     // react-native-webgpu renders black through three's output pass, shadow
@@ -426,35 +433,42 @@ function* prepareCityScene(context: ThreeContext, initial: CitySceneParams): Gen
     const streamCamera = { x: 0, y: 0, z: 0 };
     let lastOriginChanged = true;
 
-    function positionCamera(value: CityCamera) {
+    function positionCamera(value: CityCamera, cinematicShot: KlippCameraShot | null | undefined, delta: number, reducedMotion: boolean) {
       if (![value.x, value.z, value.yaw, value.distance].every(Number.isFinite)) throw new Error('Invalid city camera');
       cameraPose(value, pose);
       const desiredNear = Math.max(0.1, Math.min(5, pose.distance * 0.02));
       const nearPlaneRadius = desiredNear * Math.hypot(1, Math.tan(camera.fov * Math.PI / 360) * camera.aspect);
       constrainCamera(pose, Math.max(CAMERA_CLEARANCE, nearPlaneRadius));
       const ox = origin.cx * CELL, oz = origin.cz * CELL;
-      streamCamera.x = pose.position[0];
-      streamCamera.y = pose.position[1];
-      streamCamera.z = pose.position[2];
-      // No spreads in the frame loop: each would materialise an arguments array.
-      camera.position.set(pose.position[0] - ox, pose.position[1], pose.position[2] - oz);
-      camera.lookAt(pose.target[0] - ox, pose.target[1], pose.target[2] - oz);
-      // Near and far follow the zoom so depth precision holds from 8 m to 3 km.
+      // Chase clipping follows the unobstructed eye while the saved distance
+      // remains the player's requested orbit. Authored shots keep their lens.
       const eyeDistance = Math.hypot(pose.position[0] - pose.target[0], pose.position[2] - pose.target[2]);
       const near = Math.max(0.1, Math.min(5, eyeDistance * 0.02));
       const far = Math.max(3000, pose.distance * 6);
-      if (camera.near !== near || camera.far !== far) {
-        camera.near = near;
-        camera.far = far;
-        camera.updateProjectionMatrix();
-      }
-      world.setViewDistance(pose.distance, far);
+      shots.setChase(pose.position, pose.target, near, far);
+      shots.setShot(cinematicShot);
+      shots.setReducedMotion(reducedMotion);
+      const moving = shots.update(delta);
+      const out = shots.shot;
+      const focusX = out.hasLookAtTarget ? out.lookAtTarget[0] : out.position[0];
+      const focusZ = out.hasLookAtTarget ? out.lookAtTarget[2] : out.position[2];
+      const viewDistance = out.hasLookAtTarget
+        ? Math.hypot(out.position[0] - focusX, out.position[1] - out.lookAtTarget[1], out.position[2] - focusZ)
+        : pose.distance;
+      world.setViewDistance(viewDistance, camera.far);
       // After the distance: tree LOD reads it.
-      world.setFocus(value.x, value.z, origin.cx * CELL, origin.cz * CELL, lastOriginChanged);
-      world.sky.position.set(pose.position[0], pose.position[1], pose.position[2]);
-      world.sky.scale.setScalar(far * 0.9);
+      world.setFocus(focusX, focusZ, ox, oz, lastOriginChanged);
+      world.sky.position.set(out.position[0], out.position[1], out.position[2]);
+      world.sky.scale.setScalar(camera.far * 0.9);
+      // The rig and streaming retain world metres; only rendered position
+      // shifts into the shared floating origin. Klipp already wrote rotation.
+      streamCamera.x = out.position[0];
+      streamCamera.y = out.position[1];
+      streamCamera.z = out.position[2];
+      camera.position.set(out.position[0] - ox, out.position[1], out.position[2] - oz);
+      return moving;
     }
-    positionCamera(initial.camera);
+    positionCamera(initial.camera, initial.cinematicShot, 0, false);
     // The START set, after every scene pass above (shadow roles, depth offsets) has reached the layer templates.
     camera.updateMatrixWorld();
     world.primeStream(streamCamera, errorScale(), preset.residentRadiusM * STREAM_START_SHARE);
@@ -543,7 +557,7 @@ function* prepareCityScene(context: ThreeContext, initial: CitySceneParams): Gen
           moving = anyMoving;
         }
         // After the actors: a chase camera reads the Caller's position in this frame's params.
-        positionCamera(params.camera);
+        const cameraMoving = positionCamera(params.camera, params.cinematicShot, frame.delta, frame.reducedMotion === true);
         // Cells in and out for this camera; while some are still to build or fading, ask for the next frame.
         if (world.updateStream(streamCamera, errorScale(), now / 1000)) invalidate?.();
         if (streamLog && world.stream && now - streamLogAt >= 5000) {
@@ -555,7 +569,7 @@ function* prepareCityScene(context: ThreeContext, initial: CitySceneParams): Gen
           });
         }
         if (rig) {
-          rig.update(camera.position.y, params.camera.x - origin.cx * CELL, params.camera.z - origin.cz * CELL);
+          rig.update(camera.position.y, shots.shot.lookAtTarget[0] - origin.cx * CELL, shots.shot.lookAtTarget[2] - origin.cz * CELL);
           const preset = params.preset ?? DEFAULT_PHYSICAL_PRESET;
           if (preset !== rig.preset) {
             // The rebake renders PMREM cube faces through renderer.render, which
@@ -566,8 +580,8 @@ function* prepareCityScene(context: ThreeContext, initial: CitySceneParams): Gen
             invalidate?.();
           }
           // Night light follows the camera and the preset's interior glow (world/physical/night-lights.ts).
-          const fx = pose.target[0] - pose.position[0];
-          const fz = pose.target[2] - pose.position[2];
+          const fx = shots.shot.lookAtTarget[0] - streamCamera.x;
+          const fz = shots.shot.lookAtTarget[2] - streamCamera.z;
           const fl = Math.hypot(fx, fz) || 1;
           world.updateNightLights(
             streamCamera.x, streamCamera.y, streamCamera.z, fx / fl, fz / fl, rig.uniforms.uInteriorGlow.value,
@@ -577,7 +591,7 @@ function* prepareCityScene(context: ThreeContext, initial: CitySceneParams): Gen
         // live the loop must keep drawing, or the on-demand canvas freezes
         // the weather with the world.
         const precip = world.weather;
-        if (moving || (precip !== null && Math.max(precip.wet.value, precip.snow.value) > 0.01)) invalidate?.();
+        if (moving || cameraMoving || (precip !== null && Math.max(precip.wet.value, precip.snow.value) > 0.01)) invalidate?.();
         if (probeWindow) {
           const end = typeof performance !== 'undefined' ? performance.now() : Date.now();
           probeSample.cpuMs = end - now;
@@ -597,6 +611,8 @@ function* prepareCityScene(context: ThreeContext, initial: CitySceneParams): Gen
         if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return;
         camera.aspect = width / height;
         camera.updateProjectionMatrix();
+        // Klipp converts normalised viewOffset to pixels with this size.
+        shots.setSize(width, height);
         // The canvas just re-stamped the raw device pixel ratio — re-apply the scale.
         renderScale?.resized();
         if (adaptive && !upscalePass && adaptiveScaleFactor !== 1) {

@@ -2,6 +2,7 @@
 
 import { Platform } from 'react-native';
 import { APP_ORIGIN, createAuth, type Auth } from '@acme/auth';
+export { APP_ORIGIN } from '@acme/auth';
 
 /**
  * The auth surface for the app: `EXPO_PUBLIC_AUTH_URL` names the admin-vite
