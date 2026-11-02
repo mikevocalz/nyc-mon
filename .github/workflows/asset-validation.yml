@@ -1,0 +1,49 @@
+name: Asset validation
+
+# Gap 4 of docs/implementation/asset-pipeline.md ("CI: wire validate-glb.mjs +
+# a tri/UV/normals check into a workflow"). The container walk, bounds,
+# triangle budget and NORMAL/TEXCOORD_0 checks all live in
+# tooling/assets/validate-glb.mjs (warnings fail the gate — import must be
+# explicit); the generic LOD bake is covered by its node --test roundtrip.
+on:
+  pull_request:
+    paths:
+      - 'packages/assets/**/*.glb'
+      - 'tooling/assets/**'
+      - 'packages/payload/src/**/glb.ts'
+      - '.github/workflows/asset-validation.yml'
+permissions:
+  contents: read
+jobs:
+  glb:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Committed corpus: the four shipped hatch GLBs plus their upstream
+      # Blender exports under packages/assets/eggs/*/source/.
+      - name: Validate every committed GLB under packages/assets/eggs
+        run: |
+          shopt -s globstar nullglob
+          tiered=() plain=()
+          for f in packages/assets/eggs/**/*.glb; do
+            base="${f%.glb}"; base="${base%.near}"; base="${base%.mid}"; base="${base%.far}"
+            if [[ -f "${base}.lod.json" ]]; then tiered+=("$f"); else plain+=("$f"); fi
+          done
+          echo "corpus: $((${#tiered[@]} + ${#plain[@]})) file(s) — ${#tiered[@]} tier-documented"
+          # A GLB with a <name>.lod.json ships documented LOD tiers (lod.mjs);
+          # its near tier is deliberately full-res — relax only the tri cap,
+          # every other check still applies.
+          ((${#plain[@]})) && node tooling/assets/validate-glb.mjs "${plain[@]}"
+          ((${#tiered[@]})) && node tooling/assets/validate-glb.mjs --max-tris 500000 "${tiered[@]}"
+      # lod.mjs decodes through meshoptimizer — needs the pnpm install above.
+      - name: LOD bake roundtrip test
+        run: node --test tooling/assets/lod.test.mjs

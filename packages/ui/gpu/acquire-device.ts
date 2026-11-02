@@ -37,6 +37,27 @@ export interface AcquireDeviceDeps {
 }
 
 /**
+ * What the app's own device asks for: every feature the adapter advertises —
+ * compressed-format uploads (KTX2) validate against the device's features, not
+ * the adapter's — and the adapter's limits. three r187 does the same when it
+ * owns device creation (three.webgpu.js, WebGPUBackend init). Test doubles may
+ * expose neither, so both read defensively. `label` names the source in GPU
+ * traces (chrome://gpu, Dawn error text).
+ */
+export function ownDeviceDescriptor(adapter: GPUAdapter): GPUDeviceDescriptor {
+  // for...in reaches GPUSupportedLimits' WebIDL attributes; spread and
+  // Object.keys see none, which is why requiredLimits is not `adapter.limits`.
+  const requiredLimits: Record<string, number> = {};
+  const limits = (adapter.limits ?? {}) as unknown as Record<string, number>;
+  for (const name in limits) requiredLimits[name] = limits[name]!;
+  return {
+    label: 'nyc-mon:own',
+    requiredFeatures: (adapter.features ? [...adapter.features] : []) as GPUFeatureName[],
+    requiredLimits,
+  };
+}
+
+/**
  * The shared device first; on any failure the app's own device, with the
  * reason kept so the probe and the log can say which device three and
  * TypeGPU ended up on. G9 keeps separate devices when sharing fails, so a
@@ -46,12 +67,49 @@ export interface AcquireDeviceDeps {
 export async function acquireSharedOrOwnDevice(deps: AcquireDeviceDeps): Promise<AcquiredDevice | null> {
   let sharedError: string;
   try {
-    const device = await deps.importShared();
-    return { device, source: 'shared', sharedError: null };
+    const shared = await withTimeout(deps.importShared(), REQUEST_ADAPTER_TIMEOUT_MS);
+    if (shared) return { device: shared, source: 'shared', sharedError: null };
+    sharedError = 'importShared() timed out or returned no device';
   } catch (error) {
     sharedError = error instanceof Error ? error.message : String(error);
   }
-  const adapter = await deps.requestAdapter();
+  const adapter = await requestAdapterWithTimeout(deps.requestAdapter).catch(() => null);
   if (!adapter) return null;
-  return { device: await adapter.requestDevice(), source: 'own', sharedError };
+  return { device: await requestDeviceWithFallback(adapter), source: 'own', sharedError };
+}
+
+/**
+ * The full descriptor (every advertised feature and limit) buys the widest
+ * device on capable GPUs — but a device can refuse it even though every entry
+ * came from its own adapter (Dawn requestDevice rejects a requiredFeatures/
+ * requiredLimits member it won't grant). Fall back to a bare requestDevice
+ * before declaring the GPU unsupported — an adapterless failure must come
+ * from requestAdapter returning null, not from a strict descriptor. Both
+ * attempts are time-bounded: on wedged adapters requestDevice can stall
+ * without settling, which previously left the app on a black canvas instead
+ * of the 2D fallback (A12X iPad Pro, Dawn 157).
+ */
+const REQUEST_DEVICE_TIMEOUT_MS = 8000;
+const REQUEST_ADAPTER_TIMEOUT_MS = 10000;
+
+/**
+ * Adapter requests can also stall without settling on a wedged Dawn backend
+ * (same failure class as requestDevice — the canvas mounts while support is
+ * `pending` and covers the app with a black view). Bounded for the same
+ * reason: a hang must end at unsupported, not a frozen screen.
+ */
+export function requestAdapterWithTimeout<T>(request: () => Promise<T | null>): Promise<T | null> {
+  return withTimeout(request(), REQUEST_ADAPTER_TIMEOUT_MS);
+}
+
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | null> {
+  return Promise.race([p.then((v) => v as T | null), new Promise<null>((r) => setTimeout(() => r(null), ms))]);
+}
+
+export async function requestDeviceWithFallback(adapter: GPUAdapter): Promise<GPUDevice> {
+  const wide = await withTimeout(adapter.requestDevice(ownDeviceDescriptor(adapter)), REQUEST_DEVICE_TIMEOUT_MS).catch(() => null);
+  if (wide) return wide;
+  const bare = await withTimeout(adapter.requestDevice(), REQUEST_DEVICE_TIMEOUT_MS);
+  if (!bare) throw new Error('requestDevice() timed out or returned no device');
+  return bare;
 }

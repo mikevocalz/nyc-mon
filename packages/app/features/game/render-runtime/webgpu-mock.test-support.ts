@@ -109,7 +109,7 @@ export function fakeSkia(owner: FakeDevice, options: { pointer?: bigint } = {}) 
       },
     },
     Image: {
-      MakeImageFromGPUTexture(texture: FakeTexture) {
+      MakeFromGPUTexture(texture: FakeTexture) {
         check(texture);
         return { dispose() {} };
       },

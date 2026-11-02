@@ -10,6 +10,15 @@
  * swapchain hand-off, which can block on buffer availability) — plus the
  * renderer's own counters (`renderer.info.render`) and the drawing-buffer
  * size. `cpuMs` remains the sum of all stages so old and new logs compare.
+ *
+ * GPU channel (Phase 4): `gpuMs` is the GPU's own clock for a render
+ * frame — the total of that frame's timestamped passes resolved through
+ * three's timestamp-query pool (EXPO_PUBLIC_WORLD_PERF, @acme/ui/three
+ * gpu-timestamps.ts). It lags its sample's frame by at least one draw, and
+ * under GPU backpressure several frames resolve in one batch and only the
+ * last one's total is kept — so the channel can be sparse. cpuMs/gpuMs is
+ * the CPU/GPU split the audit asked for: encode-bound draws read high cpu,
+ * low gpu; render-bound draws read the reverse.
  */
 export interface FrameTimingSample {
   readonly cpuMs: number;
@@ -30,6 +39,12 @@ export interface FrameTimingSample {
   /** Drawing-buffer pixels this frame (canvas.width/height); absent on old probes. */
   readonly bufferW?: number;
   readonly bufferH?: number;
+  /**
+   * GPU render-pass ms from three's timestamp pool (EXPO_PUBLIC_WORLD_PERF),
+   * attributed to the last resolved frame — not necessarily this one.
+   * Absent when the channel never armed; null while armed but unresolved.
+   */
+  readonly gpuMs?: number | null;
 }
 /** The probe's writable sample — producers reuse one object per frame, so the fields they fill cannot be readonly. */
 export type MutableFrameTimingSample = { -readonly [K in keyof FrameTimingSample]: FrameTimingSample[K] };
@@ -49,6 +64,14 @@ export interface FrameStageSummary {
   readonly bufferW: number;
   readonly bufferH: number;
 }
+/** The GPU channel's order statistics; null when no sample carried a resolved gpuMs. */
+export interface FrameGpuSummary {
+  /** Samples that carried a real gpuMs — can be fewer than `samples` under backpressure. */
+  readonly samples: number;
+  readonly p50Ms: number;
+  readonly p90Ms: number;
+  readonly worstMs: number;
+}
 export interface FrameTimingSummary {
   readonly samples: number;
   readonly activeIntervals: number;
@@ -63,13 +86,19 @@ export interface FrameTimingSummary {
   readonly intervalP90Ms: number | null;
   /** Per-stage attribution; null when every sample came from an old probe. */
   readonly stages: FrameStageSummary | null;
+  /**
+   * The GPU half of the CPU/GPU split; null when no sample in the window
+   * carried gpuMs (flag off, feature absent, or never resolved). Compare
+   * against cpuP50Ms/stages.renderP50Ms for encode- vs render-bound.
+   */
+  readonly gpu: FrameGpuSummary | null;
 }
 export const FRAME_SAMPLE_CAP = 120;
 export const ACTIVE_INTERVAL_MAX_MS = 250;
 export const SIXTY_HZ_BUDGET_MS = 1000 / 60;
 const percentile = (sorted: readonly number[], q: number): number =>
   sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil(q * sorted.length) - 1))] ?? 0;
-const valid = (v: number | undefined): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0;
+const valid = (v: number | null | undefined): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0;
 
 export class FrameSampleWindow {
   private readonly cpu = new Float32Array(FRAME_SAMPLE_CAP);
@@ -79,15 +108,18 @@ export class FrameSampleWindow {
   private readonly present = new Float32Array(FRAME_SAMPLE_CAP);
   private readonly drawCalls = new Float32Array(FRAME_SAMPLE_CAP);
   private readonly tris = new Float32Array(FRAME_SAMPLE_CAP);
+  private readonly gpu = new Float32Array(FRAME_SAMPLE_CAP);
   private sampleCount = 0;
   private stageCount = 0;
   private counterCount = 0;
+  private gpuCount = 0;
   private intervalCount = 0;
   private parkedCount = 0;
   private slowCount = 0;
   private readonly intervals = new Float32Array(FRAME_SAMPLE_CAP);
   private worst = 0;
   private trisMax = 0;
+  private gpuWorst = 0;
   private lastBufferW = 0;
   private lastBufferH = 0;
 
@@ -115,6 +147,13 @@ export class FrameSampleWindow {
       }
       if (valid(sample.bufferW)) this.lastBufferW = sample.bufferW;
       if (valid(sample.bufferH)) this.lastBufferH = sample.bufferH;
+    }
+    // gpuMs keeps its own count: the channel resolves asynchronously, so
+    // only some samples carry it. null means "armed, unresolved", not 0 ms.
+    if (valid(sample.gpuMs)) {
+      this.gpu[this.gpuCount] = sample.gpuMs;
+      this.gpuWorst = Math.max(this.gpuWorst, sample.gpuMs);
+      this.gpuCount++;
     }
     const dt = sample.intervalMs;
     if (typeof dt === 'number' && Number.isFinite(dt) && dt > 0) {
@@ -146,6 +185,13 @@ export class FrameSampleWindow {
     const sortedIntervals = this.intervalCount > 0
       ? Array.from(this.intervals.subarray(0, this.intervalCount)).sort((a,b)=>a-b)
       : null;
+    const sortedGpu = Array.from(this.gpu.subarray(0, this.gpuCount)).sort((a,b)=>a-b);
+    const gpu: FrameGpuSummary | null = this.gpuCount === 0 ? null : {
+      samples: this.gpuCount,
+      p50Ms: percentile(sortedGpu, .5),
+      p90Ms: percentile(sortedGpu, .9),
+      worstMs: this.gpuWorst,
+    };
     const report: FrameTimingSummary = {
       samples: this.sampleCount,
       activeIntervals: this.intervalCount,
@@ -157,6 +203,7 @@ export class FrameSampleWindow {
       intervalP50Ms: sortedIntervals === null ? null : percentile(sortedIntervals, .5),
       intervalP90Ms: sortedIntervals === null ? null : percentile(sortedIntervals, .9),
       stages,
+      gpu,
     };
     this.reset();
     return report;
@@ -166,10 +213,12 @@ export class FrameSampleWindow {
     this.sampleCount = 0;
     this.stageCount = 0;
     this.counterCount = 0;
+    this.gpuCount = 0;
     this.intervalCount = 0;
     this.parkedCount = 0;
     this.slowCount = 0;
     this.worst = 0;
     this.trisMax = 0;
+    this.gpuWorst = 0;
   }
 }

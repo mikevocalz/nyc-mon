@@ -3,12 +3,26 @@
 // copies. Platform IO and the store resolve through platform.ts / platform.native.ts (Metro picks the native file).
 import { createCellSource, type CellSource } from './cell-source.ts';
 import { VD_CELL_MANIFEST } from './data/vd-cells-manifest.ts';
+import { VD_SYSTEM_MANIFEST } from './data/vd-systems-manifest.ts';
 import { platformIo, platformStore } from './platform.ts';
 import type { CellIo, CellManifest, CellStore } from './types.ts';
 
 export type { CellSource } from './cell-source.ts';
 export type { CellManifest, CellRef } from './types.ts';
-export { VD_CELL_MANIFEST };
+export { VD_CELL_MANIFEST, VD_SYSTEM_MANIFEST };
+
+/**
+ * The runtime manifest: geometry cells plus the game-system packs. The two generated manifests key on
+ * disjoint namespaces (`far/`/`lite/`/`near/`/`ringN-*`/`structures/` against `colliders/`/`pednet/`/
+ * `traffic/`/`spawns/`/`labels/`), so the spread is a union, never an overwrite — asserted by
+ * vd-systems-manifest.test.ts. Until this merge existed the system packs fell through to the
+ * unmanifested-bundled fallback in cell-source.ts, served without their sha256 + bytes pin; merged,
+ * they verify exactly like geometry cells.
+ */
+export const VD_MANIFEST: CellManifest = {
+  version: 1,
+  cells: { ...VD_CELL_MANIFEST.cells, ...VD_SYSTEM_MANIFEST.cells },
+};
 
 export interface VdCellSourceConfig {
   /** Remote root the manifest's paths hang under; undefined disables downloads (bundled + cache only). */
@@ -32,7 +46,7 @@ export function configureVdCellSource(config: VdCellSourceConfig = {}): CellSour
   const env = typeof process !== 'undefined' && process.env ? process.env.EXPO_PUBLIC_VD_CELL_BASE : undefined;
   const baseUrl = config.baseUrl ?? (env || undefined);
   configured = createCellSource({
-    manifest: config.manifest ?? VD_CELL_MANIFEST,
+    manifest: config.manifest ?? VD_MANIFEST,
     io: config.io ?? platformIo(),
     store: config.store ?? platformStore(),
     baseUrl,
@@ -65,4 +79,16 @@ export function vdCellFetch(key: string, bundled?: () => Promise<Uint8Array | Ar
   const s = vdCellSource();
   if (!s) return bundled ? bundled().catch(() => null) : Promise.resolve(null);
   return s.fetch(key, bundled);
+}
+
+/**
+ * The fetch for a game-system pack: `kind` is the VGC1 kind name ('colliders', 'pednet', 'traffic',
+ * 'spawns', 'labels' — cell-pack.ts PACK_KIND) and `key` its cell part ('<cx>_<cz>'). The manifest key
+ * is `<kind>/<key>`; every emitted pack is `bundled: true`, so the caller's `bundled` loader (the
+ * VD_SYSTEM_ASSETS require id through fetchAssetBytes) is preferred and verified against the pin —
+ * an unmanifested key never reaches the unverified fallback here, only a caller that hands in no
+ * loader at all. Null resolves to "skip this cell", same contract as vdCellFetch.
+ */
+export function vdSystemFetch(kind: string, key: string, bundled?: () => Promise<Uint8Array | ArrayBuffer>): Promise<Uint8Array | ArrayBuffer | null> {
+  return vdCellFetch(`${kind}/${key}`, bundled);
 }

@@ -127,6 +127,15 @@ export interface CellStream {
    * Its template is warmed on its first build if its spec says so, else on the next update.
    */
   addExternal(ext: ExternalLayer): void;
+  /**
+   * Swaps the live WorldPreset (perf/adaptive-tiers.ts): the want/keep thresholds, the radius, the
+   * hysteresis, the budgets and the per-frame stream budget all read through it, so the next pick
+   * re-ranks under the new row. Cells the smaller row no longer wants drain through the normal
+   * evictAfterS path — a downgrade shrinks residency over seconds, not instantly. Mount-time fields
+   * the streamer never reads (the vd port's own layer budgets, shadowTile, upscaleScale) do not
+   * follow the swap.
+   */
+  setPreset(next: WorldPreset): void;
   /** Every cell mesh and any material cloned for the fade; packages are dropped. */
   dispose(): void;
 }
@@ -218,7 +227,9 @@ const triangleCount = (pkg: CellPackage) => pkg.triangles ?? pkg.vertexCount / 3
  * does not take are left as they are. Call before any frame draws: the source geometry is disposed unuploaded.
  */
 export function createCellStream(THREE: Three, meshes: readonly Mesh[], options: CellStreamOptions): CellStream {
-  const preset = options.preset;
+  // `let`, not const: the adaptive tier swap re-points the whole row (setPreset) — every read below
+  // goes through `preset.` at call time, so the next pick runs under the new thresholds.
+  let preset = options.preset;
   const now = options.now ?? (() => (typeof performance !== 'undefined' ? performance.now() : Date.now()));
   const log = options.log;
   const layers: Layer[] = [];
@@ -607,6 +618,12 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
       return requests.length > 0 || polling > 0 || fading;
     },
     addExternal,
+    setPreset(next: WorldPreset): void {
+      if (next === preset) return;
+      preset = next;
+      // A fresh pick under the new thresholds on the next update; nothing evicts instantly.
+      last.at = -Infinity;
+    },
     dispose() {
       for (const slot of slots) if (slot.mesh) evict(slot);
       // The template geometry stays with its mesh, whose builder disposes it (city-mesh.ts, facelift, road paint);

@@ -1,5 +1,6 @@
 import { Image } from 'react-native';
 import { binaryFetch } from '../../net/index.native';
+import { fetchBytesWithDeadline } from '../../net/deadline';
 import { readWithProgress } from '../mon/load-progress';
 
 /**
@@ -17,10 +18,11 @@ export async function fetchEggBytes(
   const uri = typeof source === 'string' ? source : Image.resolveAssetSource(source)?.uri;
   if (!uri) throw new Error(`no URI for egg GLB asset ${String(source)}`);
   if (!/^[a-z][a-z0-9+.-]*:/i.test(uri)) throw new Error(`egg GLB resolved to "${uri}", which is not a fetchable URI`);
-  const response = await binaryFetch(uri);
-  if (!response.ok) throw new Error(`GET ${uri} answered ${response.status}`);
-  // With a listener, stream the body when the platform exposes one (web).
-  // nitro-fetch buffers the body natively and its stream is a single chunk,
-  // so native progress jumps from 0 to done as before.
-  return onProgress ? readWithProgress(response, onProgress) : response.arrayBuffer();
+  // A stalled dev-server asset request used to hold the game's load forever
+  // (the Promise.all in load-game-scene never resolved — A12X iPad): the
+  // deadline turns a hang into a reject, and the caller's catch resolves null.
+  const buf = await fetchBytesWithDeadline(uri, undefined, undefined, binaryFetch as never);
+  if (!onProgress) return buf;
+  onProgress(buf.byteLength, buf.byteLength);
+  return buf;
 }

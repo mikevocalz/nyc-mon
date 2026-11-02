@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import type { TgpuRoot } from 'typegpu';
 import { createStore } from 'zustand/vanilla';
 import { useStore } from 'zustand';
-import { acquireSharedOrOwnDevice, SHARED_GPU_DEVICE, type GpuDeviceSource } from './acquire-device';
+import { acquireSharedOrOwnDevice, requestAdapterWithTimeout, requestDeviceWithFallback, SHARED_GPU_DEVICE, type GpuDeviceSource } from './acquire-device';
 import { loadWebGpu } from './load-webgpu';
 import type { GpuSupport, WebGpuModule } from './types';
 
@@ -14,6 +14,8 @@ interface GpuState {
   module: WebGpuModule | null;
   /** Which device `root` sits on: `shared` is Skia's Graphite device (EXPO_PUBLIC_WORLD_PHYSICAL only). */
   deviceSource: GpuDeviceSource | null;
+  /** Why `support` is `unsupported` — which acquisition leg failed (for diagnostics). */
+  reason: string | null;
 }
 
 /**
@@ -28,14 +30,15 @@ export const gpuStore = createStore<GpuState>(() => ({
   format: null,
   module: null,
   deviceSource: null,
+  reason: null,
 }));
 
 let starting: Promise<void> | null = null;
 
 async function start(): Promise<void> {
   try {
-    const module = await loadWebGpu();
-    const adapter = module ? await navigator.gpu.requestAdapter() : null;
+    const module = await requestAdapterWithTimeout(loadWebGpu);
+    const adapter = module ? await requestAdapterWithTimeout(() => navigator.gpu.requestAdapter()) : null;
     if (!module || !adapter) {
       // Distinguish "no navigator.gpu" from "adapter request resolved null":
       // the unsupported state is terminal, so the cause must be in the log.
@@ -43,12 +46,12 @@ async function start(): Promise<void> {
         '[GpuCanvas] WebGPU unavailable, using the fallback renderer.',
         !module ? 'navigator.gpu is not installed' : 'requestAdapter() returned null',
       );
-      gpuStore.setState({ support: 'unsupported' });
+      gpuStore.setState({ support: 'unsupported', reason: !module ? 'no-navigator-gpu' : 'adapter-null-or-timeout' });
       return;
     }
     // TypeGPU (~110 KB gzip) loads only once a device exists: every page
     // that mounts a canvas would otherwise ship it, WebGPU or not.
-    const [device, { tgpu }] = await Promise.all([adapter.requestDevice(), import('typegpu')]);
+    const [device, { tgpu }] = await Promise.all([requestDeviceWithFallback(adapter), import('typegpu')]);
     adopt(tgpu.initFromDevice({ device }), module, 'own');
   } catch (error) {
     console.warn('[GpuCanvas] WebGPU unavailable, using the fallback renderer.', error);
@@ -97,7 +100,7 @@ async function startShared(): Promise<void> {
     const module = await loadWebGpu();
     if (!module) {
       console.warn('[GpuCanvas] WebGPU unavailable, using the fallback renderer.', 'navigator.gpu is not installed');
-      gpuStore.setState({ support: 'unsupported' });
+      gpuStore.setState({ support: 'unsupported', reason: 'no-navigator-gpu' });
       return;
     }
     const [acquired, { tgpu }] = await Promise.all([
@@ -109,14 +112,14 @@ async function startShared(): Promise<void> {
     ]);
     if (!acquired) {
       console.warn('[GpuCanvas] WebGPU unavailable, using the fallback renderer.', 'requestAdapter() returned null');
-      gpuStore.setState({ support: 'unsupported' });
+      gpuStore.setState({ support: 'unsupported', reason: 'shared-timeout-and-adapter-null' });
       return;
     }
     if (acquired.sharedError) console.warn('[GpuCanvas] Skia device not shared, using an own device:', acquired.sharedError);
     adopt(tgpu.initFromDevice({ device: acquired.device }), module, acquired.source);
   } catch (error) {
     console.warn('[GpuCanvas] WebGPU unavailable, using the fallback renderer.', error);
-    gpuStore.setState({ support: 'unsupported' });
+    gpuStore.setState({ support: 'unsupported', reason: `shared-fail:${error instanceof Error ? error.message.slice(0, 120) : String(error).slice(0, 120)}` });
   }
 }
 

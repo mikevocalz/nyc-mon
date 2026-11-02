@@ -69,7 +69,7 @@ test('the physical chain: ACES once, every stage wired on the high tier, legacy 
     renderer, scene, camera, options: { bloom: true, aa: true, grade: true }, physical: all(highSettings),
   });
   assert.ok(post.physical);
-  assert.deepEqual(post.physical.applied, { mrt: true, ssr: true, bloom: true, grade: true, msaaDiscard: true });
+  assert.deepEqual(post.physical.applied, { mrt: true, ssr: true, bloom: true, grade: true, msaaDiscard: true, upscale: null });
   assert.deepEqual(post.applied, { bloom: false, ao: false, aa: false, grade: false }, 'legacy chain is not wired');
   assert.equal(renderer.toneMapping, THREE.ACESFilmicToneMapping);
   assert.equal(renderer.toneMappingExposure, 1);
@@ -138,13 +138,13 @@ test('probe subsets wire only their stage', async () => {
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera();
   const aces = mountCityPostPipeline(THREE, { renderer, scene, camera, physical: only({}) });
-  assert.deepEqual(aces.physical!.applied, { mrt: false, ssr: false, bloom: false, grade: false, msaaDiscard: false });
+  assert.deepEqual(aces.physical!.applied, { mrt: false, ssr: false, bloom: false, grade: false, msaaDiscard: false, upscale: null });
   assert.equal(aces.pipeline.outputNode, aces.scenePass.getTextureNode('output'), 'aces: bare scene texture, ACES in renderOutput');
   assert.equal(renderer.toneMapping, THREE.ACESFilmicToneMapping);
   aces.dispose();
 
   const mrt = mountCityPostPipeline(THREE, { renderer, scene, camera, physical: only({ mrt: true }) });
-  assert.deepEqual(mrt.physical!.applied, { mrt: true, ssr: false, bloom: false, grade: false, msaaDiscard: false });
+  assert.deepEqual(mrt.physical!.applied, { mrt: true, ssr: false, bloom: false, grade: false, msaaDiscard: false, upscale: null });
   mrt.dispose();
 
   const ssrWithoutMrt = mountCityPostPipeline(THREE, { renderer, scene, camera, physical: only({ ssr: true }) });
