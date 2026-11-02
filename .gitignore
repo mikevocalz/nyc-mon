@@ -4,7 +4,6 @@
 node_modules
 
 # Environment
-/.argent/secrets.env
 .env
 .env.*
 !.env.example
@@ -48,3 +47,6 @@ scratchpad/
 tooling/city/.cache/
 __pycache__/
 *.blend1
+
+# Local agent credentials (never commit).
+/.argent/secrets.env
