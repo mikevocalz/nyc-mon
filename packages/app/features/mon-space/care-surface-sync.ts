@@ -27,8 +27,15 @@ export function createCareSurfaceSync(deps: {
         // notification queue preserves this order across its awaits.
         const clearing = deps.clear();
         previousMon = nextMon;
-        if (input) await deps.publish(input);
-        await clearing;
+        const [clearResult, publishResult] = await Promise.allSettled([
+          clearing,
+          Promise.resolve().then(() => input ? deps.publish(input) : undefined),
+        ]);
+        if (publishResult.status === 'rejected') {
+          if (clearResult.status === 'rejected') deps.report(clearResult.reason);
+          throw publishResult.reason;
+        }
+        if (clearResult.status === 'rejected') throw clearResult.reason;
       } else if (input) await deps.publish(input);
     }).catch(deps.report);
   };

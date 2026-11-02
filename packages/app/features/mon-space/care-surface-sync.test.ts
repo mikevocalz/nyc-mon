@@ -47,3 +47,30 @@ test('preference refresh republishes unchanged care so enabling Mon calls schedu
   sync.refresh(); await setImmediate();
   assert.equal(publishes, 2);
 });
+
+
+test('switch observes both failures and preserves publish as the primary failure', async () => {
+  const clearFailure = new Error('clear failed');
+  const publishFailure = new Error('publish failed');
+  const reported: unknown[] = [];
+  const sync = createCareSurfaceSync({
+    read: () => input('a'),
+    clear: async () => { throw clearFailure; },
+    publish: async () => { throw publishFailure; },
+    report: (error) => { reported.push(error); },
+  });
+  sync.refresh();
+  await setImmediate();
+  assert.deepEqual(reported, [clearFailure, publishFailure]);
+});
+
+test('switch reports a clear failure when publishing succeeds', async () => {
+  const failure = new Error('clear failed');
+  const reported: unknown[] = [];
+  const sync = createCareSurfaceSync({
+    read: () => input('a'), clear: async () => { throw failure; },
+    publish: async () => {}, report: (error) => { reported.push(error); },
+  });
+  sync.refresh(); await setImmediate();
+  assert.deepEqual(reported, [failure]);
+});

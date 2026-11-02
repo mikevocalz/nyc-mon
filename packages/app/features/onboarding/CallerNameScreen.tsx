@@ -86,7 +86,7 @@ export function CallerNameScreen() {
       consentStatus: under13 ? 'pending' : (existing?.consentStatus ?? 'not-required'),
       createdAt: existing?.createdAt ?? nowMs,
     };
-    const saved = storeCallerProfile(caller, nowMs, session.isPending ? undefined : session.data?.user.id);
+    const saved = storeCallerProfile(caller, nowMs, session.data.user.id);
     // The profile store reads the Caller name once at load; keep it current.
     useProfile.getState().setName(saved.caller?.callerName ?? caller.callerName);
     announcePolitely(copy('m07.confirmed.a11y.announce'));
