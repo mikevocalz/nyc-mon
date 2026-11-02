@@ -1,5 +1,6 @@
 /// <reference types="@webgpu/types" />
 import { Skia } from 'react-native-skia';
+import { coerceSkiaPointer } from './coerce-skia-pointer';
 import { importDevice } from 'react-native-webgpu';
 
 /**
