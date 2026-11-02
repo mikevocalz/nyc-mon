@@ -31,7 +31,7 @@ describe('per-individual gender and voice lineage', () => {
   });
 
   it('reaches both genders and every voice slot over a sample of eggs', () => {
-    const genders = new Set(SAMPLE.map(deriveMonGender));
+    const genders = new Set(SAMPLE.map((id) => deriveMonGender(id)));
     expect(genders).toEqual(new Set(['female', 'male']));
     const slots = new Set(SAMPLE.map((id) => parseVoiceLineageId(deriveVoiceLineageId(eggFor(id)))?.slot));
     expect(slots).toEqual(new Set(Array.from({ length: VOICE_SLOTS_PER_GENDER }, (_, i) => i + 1)));

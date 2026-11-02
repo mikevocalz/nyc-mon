@@ -63,6 +63,7 @@ const eslintConfig = defineConfig([
     'build/**',
     'public/viro/**',
     'public/canvaskit/**',
+    'public/basis/**',
     'next-env.d.ts',
   ]),
 ])
