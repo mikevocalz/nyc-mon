@@ -26,6 +26,8 @@ const frame = tv({
 export interface ImageProps extends Omit<SolitoImageProps, 'fill'> {
   /** Tailwind classes for the wrapper (size the image here when using fill). */
   className?: string;
+  /** Resolved host geometry for embedded fill images, without changing the image itself. */
+  containerStyle?: React.ComponentProps<typeof View>['style'];
   /** Fill the wrapper (wrapper must have dimensions via className). Default true when no width/height given. */
   fill?: boolean;
   /** Keyline and depth plate around the picture. Default true; false renders the bare image. */
@@ -43,7 +45,7 @@ const DEPTH = 6;
 
 // Universal content image — SolitoImage renders next/image on web and
 // expo-image on native, so one component covers both.
-export function Image({ className, fill, width, height, framed = true, district, tone, rounded = false, ...props }: ImageProps) {
+export function Image({ className, containerStyle, fill, width, height, framed = true, district, tone, rounded = false, ...props }: ImageProps) {
   const round = rounded ? 'rounded-soft overflow-hidden' : '';
   const useFill = fill ?? (width == null && height == null);
   const sized = !useFill && width != null && height != null;
@@ -51,7 +53,7 @@ export function Image({ className, fill, width, height, framed = true, district,
   if (!framed || (!useFill && !sized)) {
     if (!useFill) return <SolitoImage width={width} height={height} {...props} />;
     return (
-      <View className={`relative overflow-hidden ${round} ${className ?? ''}`}>
+      <View className={`relative overflow-hidden ${round} ${className ?? ''}`} style={containerStyle}>
         <SolitoImage fill contentFit="cover" {...props} />
       </View>
     );
@@ -65,7 +67,7 @@ export function Image({ className, fill, width, height, framed = true, district,
     <View
       className={s.root({ className: `${round} ${className ?? ''}` })}
       // Computed geometry: a fixed-size image keeps its width/height and adds the plate offset.
-      style={sized ? { width: Number(width) + DEPTH, height: Number(height) + DEPTH } : undefined}
+      style={[containerStyle, sized ? { width: Number(width) + DEPTH, height: Number(height) + DEPTH } : undefined]}
     >
       <View aria-hidden className={s.plate({ className: t ? t.plate : 'bg-ink-800' })} />
       <View className={s.face({ className: t ? t.border : 'border-ink-950' })}><SolitoImage fill contentFit="cover" {...props} /></View>

@@ -11,6 +11,7 @@
  * still pass a plain className string; both merge.
  */
 import React from 'react';
+import { buttonClassName } from './button-class';
 
 type StyleqEntry = { $$css?: boolean; [key: string]: unknown } | React.CSSProperties;
 type WebStyle = StyleqEntry | (StyleqEntry | null | undefined)[] | null | undefined;
@@ -88,6 +89,14 @@ export interface PressBaseProps extends P {
   accessibilityState?: { checked?: boolean; disabled?: boolean; selected?: boolean };
 }
 
+// Merge after decoding styleq too: CSS interop moves a caller's className
+// into style entries, so merging only the raw prop leaves flex-col beside
+// flex-row in the final class list and important styles override inline layout.
+const buttonDom = (className?: string, style?: WebStyle) => {
+  const dom = toDom(className, style);
+  return { ...dom, className: buttonClassName(dom.className) };
+};
+
 // RN views default to display:flex — raw DOM elements don't, so seed it
 // (callers' flex-row / items-* classes expect a flex container).
 export const ButtonBase = ({
@@ -102,7 +111,7 @@ export const ButtonBase = ({
     disabled={props.disabled ?? accessibilityState?.disabled}
     aria-label={props['aria-label'] ?? accessibilityLabel}
     aria-description={accessibilityHint}
-    {...toDom(`inline-flex flex-col ${className ?? ''}`, style)}
+    {...buttonDom(className, style)}
     {...props}
   />
 );

@@ -60,7 +60,9 @@
     "./three/mon/hatch-sound": "./three/mon/hatch-sound.ts",
     "./three/mon/hatch-timeline": "./three/mon/hatch-timeline.ts",
     "./three/mon/idle": "./three/mon/idle/index.ts",
-    "./site-embed": "./html/SiteEmbed.tsx"
+    "./site-embed": "./html/SiteEmbed.tsx",
+    "./studio-controls": "./studio-controls/index.tsx",
+    "./studio-controls/web": "./studio-controls/web.tsx"
   },
   "sideEffects": [
     "./rn-globals-shim.ts",
