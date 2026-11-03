@@ -21,6 +21,8 @@ export interface SegmentedControlProps<T extends string> {
   district?: District;
   /** Opt-in rounded corners (rounded-soft). Default false: square. */
   rounded?: boolean;
+  /** Neutral editing controls; the default retains the branded district face. */
+  appearance?: 'default' | 'studio';
   /**
    * Accessible name of the radio group. Give this or `aria-labelledby`
    * (the id of a visible label) unless an enclosing fieldset/legend names it.

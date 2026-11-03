@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef } from 'react';
 import { tv } from 'tailwind-variants';
+import { TYPE_SCALE_TV } from './type-scale';
 import { Pressable, View } from './tw';
 import { Text } from './Text';
 import { TONE_CLASSES, resolveControlTone } from './district';
@@ -31,9 +32,23 @@ const menu = tv({
       'focus:outline-none motion-reduce:transition-none',
     label: 'text-base',
   },
-});
+  variants: {
+    appearance: {
+      default: {},
+      studio: {
+        plate: 'hidden',
+        face: 'rounded-[4px] border border-[#4A4D54] bg-[#2C2E33] py-1',
+        cornice: 'mb-1 border-b border-[#45484F] bg-transparent px-3 py-2',
+        title: 'font-sans font-medium text-[12px] text-[#AEB4BE]',
+        item: 'border-l-0 px-3 py-2',
+        label: 'font-sans font-medium text-[13px]',
+      },
+    },
+  },
+  defaultVariants: { appearance: 'default' },
+}, TYPE_SCALE_TV);
 
-export function Menu({ children, actions, onAction, title, className, district, tone }: MenuProps) {
+export function Menu({ children, actions, onAction, title, className, district, tone, appearance = 'default' }: MenuProps) {
   const details = useRef<HTMLDetailsElement>(null);
   const reposition = useRef<(() => void) | null>(null);
   const close = useCallback((restoreFocus: boolean) => {
@@ -114,7 +129,8 @@ export function Menu({ children, actions, onAction, title, className, district, 
   const toneName = resolveControlTone(tone, district);
   const t = TONE_CLASSES[toneName];
   const bar = ROW_BAR[toneName];
-  const s = menu();
+  const studio = appearance === 'studio';
+  const s = menu({ appearance });
   return (
     <details ref={details} className={`relative open:z-50 ${className ?? ''}`}>
       <summary className="cursor-pointer list-none">{children}</summary>
@@ -122,8 +138,8 @@ export function Menu({ children, actions, onAction, title, className, district, 
         <View aria-hidden className={s.plate()} />
         <View className={s.face()}>
           {title ? (
-            <View className={s.cornice({ className: t.face })}>
-              <Text className={s.title({ className: toneName === 'apple' ? 'text-ink-950' : t.onFace })}>{title}</Text>
+            <View className={s.cornice({ className: studio ? undefined : t.face })}>
+              <Text className={s.title({ className: studio ? undefined : toneName === 'apple' ? 'text-ink-950' : t.onFace })}>{title}</Text>
             </View>
           ) : null}
           {actions.map((action) => (
@@ -141,7 +157,7 @@ export function Menu({ children, actions, onAction, title, className, district, 
                   ? 'opacity-40'
                   : action.destructive
                     ? 'hover:border-l-apple-500 hover:bg-apple-500/15 focus:border-l-apple-500 focus:bg-apple-500/15'
-                    : `${bar.hover} ${bar.hoverTint} ${bar.focus} ${bar.focusTint}`,
+                    : studio ? 'hover:bg-white/5 focus:bg-white/10' : `${bar.hover} ${bar.hoverTint} ${bar.focus} ${bar.focusTint}`,
               })}
             >
               <Text className={s.label({ className: action.destructive ? 'text-apple-400' : 'text-ink-50' })}>

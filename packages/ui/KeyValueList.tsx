@@ -1,5 +1,6 @@
 'use client';
 import { tv } from 'tailwind-variants';
+import { TYPE_SCALE_TV } from './type-scale';
 import { DescriptionDetails, DescriptionList, DescriptionTerm } from './primitives';
 import { View } from './tw';
 import { Badge } from './Badge';
@@ -23,6 +24,7 @@ const kv = tv({
     action: 'shrink-0',
   },
   variants: {
+    appearance: { default: {}, studio: { grid: 'gap-x-4 gap-y-3', term: 'font-sans text-[12px] text-[#AEB3BD]', details: 'font-sans text-[13px] text-[#E4E7EC]' } },
     columns: {
       1: { grid: 'flex-col' },
       // CSS columns so a pair can break to the second column, never inside itself.
@@ -33,8 +35,8 @@ const kv = tv({
       night: { term: 'text-silver-400', details: 'text-silver-100' },
     },
   },
-  defaultVariants: { columns: 1, surface: 'page' },
-});
+  defaultVariants: { columns: 1, surface: 'page', appearance: 'default' },
+}, TYPE_SCALE_TV);
 
 export interface KeyValueItem {
   key: string;
@@ -46,6 +48,8 @@ export interface KeyValueItem {
 }
 
 export interface KeyValueListProps {
+  /** Compact document-inspector type, shared by web and native. */
+  appearance?: 'default' | 'studio';
   items: readonly KeyValueItem[];
   /** Two columns above 600 px pane width; the prop caps it at one. Default 2. */
   columns?: 1 | 2;
@@ -54,9 +58,9 @@ export interface KeyValueListProps {
   className?: string;
 }
 
-export function KeyValueList({ items, columns = 2, surface = 'page', className }: KeyValueListProps) {
+export function KeyValueList({ items, columns = 2, surface = 'page', appearance = 'default', className }: KeyValueListProps) {
   const { size, onLayout } = useLayoutSize({ width: 1024, height: 1 });
-  const s = kv({ columns: columns === 2 && size.width >= 600 ? 2 : 1, surface });
+  const s = kv({ columns: columns === 2 && size.width >= 600 ? 2 : 1, surface, appearance });
   return (
     <View onLayout={onLayout} className={s.root({ className })}>
       <DescriptionList className={s.grid()}>

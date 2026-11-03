@@ -25,6 +25,8 @@ const toolbar = tv({
     density: {
       default: {},
       compact: {
+        root: 'bg-[#292B30] border-b border-[#414349]',
+        cornice: 'hidden', plate: 'hidden',
         row: 'min-h-13 h-auto min-w-0 px-2 md:h-auto md:px-2',
         title: 'min-w-0 font-sans text-type-caption md:text-type-caption',
       },

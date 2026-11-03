@@ -2,6 +2,7 @@
 import type { KeyboardEvent } from 'react';
 import { Platform } from 'react-native';
 import { tv } from 'tailwind-variants';
+import { TYPE_SCALE_TV } from './type-scale';
 import { haptics } from './haptics';
 import { Pressable, Text, View } from './tw';
 import { resolveControlTone, toneVariants, type ControlTone, type ToneClasses } from './district';
@@ -29,18 +30,23 @@ const segmented = tv({
   },
   variants: {
     tone: toneVariants(() => ({})),
+    appearance: {
+      default: {},
+      studio: { root: 'border border-[#45474D] bg-[#222428] gap-0.5 p-0.5 rounded-[4px]', segment: 'border-0 rounded-[3px] px-2 md:px-2', label: 'font-sans font-medium text-type-caption md:text-type-caption tracking-normal' },
+    },
     active: {
       true: {},
       false: { segment: 'border-transparent hover:bg-ink-800', label: 'text-silver-300' },
     },
   },
-  compoundVariants: (Object.entries(toneVariants((c) => c)) as [ControlTone, ToneClasses][]).map(([tone, c]) => ({
-    tone, active: true, class: { segment: `${c.face} ${c.controlKeyline}`, label: c.onFace },
-  })),
-});
+  compoundVariants: [...(Object.entries(toneVariants((c) => c)) as [ControlTone, ToneClasses][]).map(([tone, c]) => ({
+    tone, appearance: 'default' as const, active: true, class: { segment: `${c.face} ${c.controlKeyline}`, label: c.onFace },
+  })), { appearance: 'studio', active: true, class: { segment: 'bg-[#4A4E56] border-transparent', label: 'text-[#F2F3F5]' } }],
+  defaultVariants: { appearance: 'default' },
+}, TYPE_SCALE_TV);
 
 export function SegmentedControl<T extends string>({
-  options, value, onChange, className, segmentClassName, tone, district, rounded = false,
+  options, value, onChange, className, segmentClassName, tone, district, rounded = false, appearance = 'default',
   'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledBy,
 }: SegmentedControlProps<T>) {
   const resolved = resolveControlTone(tone, district);
@@ -71,11 +77,11 @@ export function SegmentedControl<T extends string>({
       role="radiogroup"
       aria-label={ariaLabel}
       aria-labelledby={ariaLabelledBy}
-      className={segmented({ tone: resolved }).root({ className: `${rounded ? 'rounded-soft' : ''} overflow-hidden ${className ?? ''}` })}
+      className={segmented({ tone: resolved, appearance }).root({ className: `${rounded ? 'rounded-soft' : ''} overflow-hidden ${className ?? ''}` })}
     >
       {options.map((option, index) => {
         const active = option.value === value;
-        const s = segmented({ tone: resolved, active });
+        const s = segmented({ tone: resolved, active, appearance });
         return (
           <Pressable
             key={option.value}

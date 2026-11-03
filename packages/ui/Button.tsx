@@ -31,6 +31,8 @@ function labelTone(look: ControlLook, tone: ControlTone) {
 export interface ButtonProps {
   /** Opt-in rounded corners (rounded-soft) in place of the neon corner cut. Default false: square, cut. */
   rounded?: boolean;
+  /** Quiet, sans-serif editing chrome; branded appearance remains the default. */
+  appearance?: 'default' | 'studio';
   /** Explicit frame radius; leaves the legacy rounded/cut defaults unchanged. */
   cornerRadius?: number;
   /** Toggle state; omitted for ordinary action buttons. */
@@ -75,7 +77,7 @@ export interface ButtonProps {
 
 export function Button({
   title, icon, onPress, variant, size = 'md', disabled, fullWidth, loading, className,
-  tone: toneProp, district, corner = 'bottom-right', glow = false, rounded = false, cornerRadius, selected, accessibilityState, testID, ...a11y
+  tone: toneProp, district, corner = 'bottom-right', glow = false, rounded = false, appearance = 'default', cornerRadius, selected, accessibilityState, testID, ...a11y
 }: ButtonProps) {
   const { look, tone } = controlLook(variant, toneProp, district);
   const off = !!(disabled || loading);
@@ -83,8 +85,9 @@ export function Button({
   const s = button({ look, size, xr, disabled: off, fullWidth });
   // cta labels read the on-cta token (signage black by day, night after dark), not the tone table.
   const care = variant === 'hlynk-care';
+  const studio = appearance === 'studio';
   const labelClass = s.label({
-    className: off ? undefined : variant === 'cta' ? 'text-on-cta' : care ? 'text-silver-300 group-active:text-signage-white' : labelTone(look, tone),
+    className: studio ? `font-sans font-medium tracking-normal ${xr ? 'text-xr-label' : 'text-[13px]'} ${off ? 'text-[#73777F]' : look === 'solid' ? 'text-[#101C28]' : look === 'ghost' ? 'text-text' : 'text-[#D8DBE0]'}` : off ? undefined : variant === 'cta' ? 'text-on-cta' : care ? 'text-silver-300 group-active:text-signage-white' : labelTone(look, tone),
   });
   const content = (
     <>
@@ -102,7 +105,7 @@ export function Button({
       aria-disabled={off}
       aria-pressed={selected}
       accessibilityState={{ ...accessibilityState, disabled: off, ...(selected === undefined ? {} : { selected }) }}
-      className={s.root({ className: `${rounded ? 'rounded-soft' : ''} ${className ?? ''}` })}
+      className={s.root({ className: `${rounded ? 'rounded-soft' : ''} ${studio ? 'active:translate-x-0 active:translate-y-0' : ''} ${className ?? ''}` })}
       outerClassName={fullWidth ? 'w-full' : outerLayout(className)}
       {...a11y}
       // The web press base is a real <button>, which takes data-testid; RN's Pressable takes testID.
@@ -110,7 +113,7 @@ export function Button({
     >
       {look === 'ghost' ? (
         <>
-          <View aria-hidden className={s.tint({ className: TONE_CLASSES[tone].soft })} />
+          <View aria-hidden className={s.tint({ className: studio ? 'bg-white/5' : TONE_CLASSES[tone].soft })} />
           {content}
         </>
       ) : (
@@ -120,7 +123,7 @@ export function Button({
           variant={off || look === 'outline' ? 'outline' : 'solid'}
           corner={corner}
           cut={CUT_FACE[size].cut}
-          depth={off || care ? 0 : 4}
+          depth={off || care || studio ? 0 : 4}
           glow={off ? false : glow}
           className={`flex-row items-center justify-center gap-2 ${CUT_FACE[size].className} ${care ? 'min-h-target' : ''}`}
         >

@@ -8,7 +8,8 @@ import type { MenuProps } from './Menu.types';
  * Native anchored menu backed by the operating system.
  * Expo UI maps this to SwiftUI Menu / ContextMenu and Jetpack Compose
  * DropdownMenu, so measurement, placement, dismissal and accessibility stay
- * with the platform rather than a hand-built React Native modal.
+ * with the platform rather than a hand-built React Native modal. The optional
+ * web `appearance` is deliberately not selected or forwarded to MenuView.
  */
 export function Menu({ children, actions, onAction, title, className }: MenuProps) {
   return (

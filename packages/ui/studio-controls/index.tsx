@@ -10,25 +10,46 @@ import { View as CanonicalView, Text as CanonicalText, ScrollView as CanonicalSc
 import { Page, Main, Header, Footer, Section, Heading, Paragraph, Link } from '../html';
 import { StudioTextInput } from './TextInput';
 import { Image as CanonicalImage } from '../Image';
-import { Menu } from '../Menu';
+import { Menu as CanonicalMenu } from '../Menu';
 import { Select as CanonicalSelect } from '../Select';
-import { SegmentedControl } from '../SegmentedControl';
+import { SegmentedControl as CanonicalSegmentedControl } from '../SegmentedControl';
 import { TabBar } from '../TabBar';
 import { DropZone } from '../DropZone';
-import { Button } from '../Button';
+import { Button as CanonicalButton } from '../Button';
 import { IconButton } from '../IconButton';
-import { Banner } from '../Banner';
+import { Banner as CanonicalBanner } from '../Banner';
 import { Badge } from '../Badge';
 import { EmptyState } from '../EmptyState';
-import { KeyValueList } from '../KeyValueList';
+import { KeyValueList as CanonicalKeyValueList } from '../KeyValueList';
 import { ErrorMessage } from '../ErrorMessage';
-import { FieldGroup } from '../FieldGroup';
+import { FieldGroup as CanonicalFieldGroup } from '../FieldGroup';
 import { Card } from '../Card';
 import { Toolbar } from '../Toolbar';
 import { List, ListItem } from '../List';
 import { NightScope } from '../NightScope';
 import { StudioPressable } from './Pressable';
 import type { StudioControls, StudioSelectProps } from './types';
+
+/** Source-owned editor appearance on the existing controls, on both platforms. */
+function Banner(props: ComponentProps<typeof CanonicalBanner>) {
+  return <CanonicalBanner appearance="studio" {...props} />;
+}
+function Menu(props: ComponentProps<typeof CanonicalMenu>) {
+  return <CanonicalMenu appearance="studio" {...props} />;
+}
+function Button(props: ComponentProps<typeof CanonicalButton>) {
+  return <CanonicalButton appearance="studio" {...props} />;
+}
+function KeyValueList(props: ComponentProps<typeof CanonicalKeyValueList>) {
+  return <CanonicalKeyValueList appearance="studio" {...props} />;
+}
+function SegmentedControl<T extends string>(props: import('../SegmentedControl.types').SegmentedControlProps<T>) {
+  return <CanonicalSegmentedControl appearance="studio" {...props} />;
+}
+const FieldGroup = Object.assign(
+  function FieldGroup(props: ComponentProps<typeof CanonicalFieldGroup>) { return <CanonicalFieldGroup {...props} />; },
+  { ...CanonicalFieldGroup, Section: (props: import('../FieldGroup.types').FieldSectionProps) => <CanonicalFieldGroup.Section appearance="studio" {...props} /> },
+);
 
 export { NightScope, List, ListItem, Card, Toolbar, Button, IconButton, Banner, Badge, EmptyState, KeyValueList, ErrorMessage, FieldGroup, StudioPressable, Menu, SegmentedControl, TabBar, DropZone, Page, Main, Header, Footer, Section, Heading, Paragraph, Link };
 export type { StudioControls, StudioPressableProps, StudioSelectProps } from './types';
