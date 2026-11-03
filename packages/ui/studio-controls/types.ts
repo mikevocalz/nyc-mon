@@ -25,6 +25,7 @@ export interface StudioControls {
   Menu: ComponentType<MenuProps>;
   Select: ComponentType<StudioSelectProps>;
   SegmentedControl: typeof import('../SegmentedControl')['SegmentedControl'];
+  TabBar: typeof import('../TabBar')['TabBar'];
   DropZone: typeof import('../DropZone')['DropZone'];
   html: Pick<typeof import('../html'), 'Page' | 'Main' | 'Header' | 'Footer' | 'Section' | 'Heading' | 'Paragraph' | 'Link'>;
 }
