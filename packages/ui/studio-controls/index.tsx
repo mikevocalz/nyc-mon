@@ -33,7 +33,7 @@ export const TextInput = StudioTextInput;
 
 /** Immutable option data is copied into the existing kit Select API. */
 export function Select({ options, ...props }: StudioSelectProps) {
-  return <CanonicalSelect {...props} options={[...options]} />;
+  return <CanonicalSelect {...props} rounded tone="royal" options={[...options]} />;
 }
 /** Adapt portable URI image props to the kit's real Solito/expo-image component. */
 export function Image({ source, style, accessibilityLabel, resizeMode, testID, onError }: ImageProps) {

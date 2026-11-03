@@ -1,4 +1,5 @@
 'use client';
+import { useCallback, useEffect, useRef } from 'react';
 import { tv } from 'tailwind-variants';
 import { Pressable, View } from './tw';
 import { Text } from './Text';
@@ -12,9 +13,10 @@ import type { MenuProps } from './Menu.types';
  * tone accent bar and tint on hover or keyboard focus. Destructive items are
  * apple red.
  *
- * `details`/`summary` gives open-on-click, close-on-outside-click and Escape
- * for free, with the correct semantics — no state, no listeners, no focus trap
- * to get wrong. (No role on the summary: a role there kills the toggle.)
+ * `details`/`summary` owns disclosure and keyboard activation. Selection,
+ * Escape and outside-pointer dismissal are explicit: details does not provide
+ * them automatically. Its DOM open state stays imperative rather than being
+ * duplicated in React state. The summary remains the focus return target.
  */
 const menu = tv({
   slots: {
@@ -31,12 +33,39 @@ const menu = tv({
 });
 
 export function Menu({ children, actions, onAction, title, className, district, tone }: MenuProps) {
+  const details = useRef<HTMLDetailsElement>(null);
+  const close = useCallback((restoreFocus: boolean) => {
+    const element = details.current;
+    if (!element?.open) return;
+    element.open = false;
+    if (restoreFocus && element.isConnected) element.querySelector('summary')?.focus();
+  }, []);
+  useEffect(() => {
+    const owner = details.current?.ownerDocument;
+    if (!owner) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const element = details.current;
+      if (element?.open && !event.composedPath().includes(element)) close(false);
+    };
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || !details.current?.open) return;
+      event.preventDefault();
+      event.stopPropagation();
+      close(true);
+    };
+    owner.addEventListener('pointerdown', onPointerDown, true);
+    owner.addEventListener('keydown', onEscape, true);
+    return () => {
+      owner.removeEventListener('pointerdown', onPointerDown, true);
+      owner.removeEventListener('keydown', onEscape, true);
+    };
+  }, [close]);
   const toneName = resolveControlTone(tone, district);
   const t = TONE_CLASSES[toneName];
   const bar = ROW_BAR[toneName];
   const s = menu();
   return (
-    <details className={`relative ${className ?? ''}`}>
+    <details ref={details} className={`relative open:z-50 ${className ?? ''}`}>
       <summary className="cursor-pointer list-none">{children}</summary>
       <View role="menu" className={s.panel()}>
         <View aria-hidden className={s.plate()} />
@@ -51,7 +80,11 @@ export function Menu({ children, actions, onAction, title, className, district, 
               key={action.id}
               role="menuitem"
               aria-disabled={action.disabled}
-              onPress={() => !action.disabled && onAction(action.id)}
+              onPress={() => {
+                if (action.disabled) return;
+                onAction(action.id);
+                close(true);
+              }}
               className={s.item({
                 className: action.disabled
                   ? 'opacity-40'
