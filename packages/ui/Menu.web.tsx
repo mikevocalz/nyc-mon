@@ -6,6 +6,7 @@ import { Text } from './Text';
 import { TONE_CLASSES, resolveControlTone } from './district';
 import { ROW_BAR } from './surface-look';
 import type { MenuProps } from './Menu.types';
+import { placeMenu } from './Menu.web-position';
 
 /**
  * Web menu in the NYC-MON look: a night panel with a heavy keyline over a
@@ -20,7 +21,7 @@ import type { MenuProps } from './Menu.types';
  */
 const menu = tv({
   slots: {
-    panel: 'absolute right-0 top-full z-10 mt-2 min-w-52',
+    panel: 'fixed z-[1000]',
     plate: 'absolute inset-0 translate-x-1.5 translate-y-1.5 bg-ink-950',
     face: 'relative border-2 border-ink-700 bg-ink-900 py-1',
     cornice: 'mb-1 px-3 py-1.5',
@@ -34,15 +35,55 @@ const menu = tv({
 
 export function Menu({ children, actions, onAction, title, className, district, tone }: MenuProps) {
   const details = useRef<HTMLDetailsElement>(null);
+  const reposition = useRef<(() => void) | null>(null);
   const close = useCallback((restoreFocus: boolean) => {
     const element = details.current;
     if (!element?.open) return;
+    const popup = element.querySelector<HTMLElement>('[role="menu"]');
+    if (typeof popup?.hidePopover === 'function' && popup.matches(':popover-open')) popup.hidePopover();
     element.open = false;
     if (restoreFocus && element.isConnected) element.querySelector('summary')?.focus();
   }, []);
   useEffect(() => {
-    const owner = details.current?.ownerDocument;
-    if (!owner) return;
+    const element = details.current;
+    const owner = element?.ownerDocument;
+    const window = owner?.defaultView;
+    const popup = element?.querySelector<HTMLElement>('[role="menu"]');
+    const trigger = element?.querySelector('summary');
+    if (!element || !owner || !window || !popup || !trigger) return;
+    // The browser top layer escapes transformed/clipped ancestors. The fixed
+    // fallback remains available for browsers without the Popover API.
+    const topLayer = typeof popup.showPopover === 'function';
+    if (topLayer) popup.setAttribute('popover', 'manual');
+    Object.assign(popup.style, { position: 'fixed', inset: 'auto', margin: '0', padding: '0', border: '0', background: 'transparent', zIndex: '1000', boxSizing: 'border-box', overflowY: 'auto', overscrollBehavior: 'contain', overflowWrap: 'anywhere' });
+    let frame = 0;
+    const position = () => {
+      if (!element.open || !element.isConnected || !popup.isConnected) return;
+      if (topLayer && !popup.matches(':popover-open')) popup.showPopover();
+      const viewport = window.visualViewport;
+      const bounds = { left: viewport?.offsetLeft ?? 0, top: viewport?.offsetTop ?? 0, width: viewport?.width ?? window.innerWidth, height: viewport?.height ?? window.innerHeight };
+      const anchor = trigger.getBoundingClientRect();
+      popup.style.width = `${Math.max(1, Math.min(Math.max(208, anchor.width), bounds.width - 16))}px`;
+      const height = popup.scrollHeight + popup.offsetHeight - popup.clientHeight;
+      const placement = placeMenu(anchor, bounds, Math.max(208, anchor.width), height);
+      Object.assign(popup.style, { left: `${placement.left}px`, top: `${placement.top}px`, width: `${placement.width}px`, maxHeight: `${placement.maxHeight}px`, visibility: 'visible' });
+    };
+    const schedule = () => {
+      if (!element.open || frame) return;
+      frame = window.requestAnimationFrame(() => { frame = 0; position(); });
+    };
+    const onToggle = (event: Event) => {
+      if (event.target !== element) return;
+      if (element.open) position();
+      else if (topLayer && popup.matches(':popover-open')) popup.hidePopover();
+    };
+    reposition.current = schedule;
+    element.addEventListener('toggle', onToggle);
+    window.addEventListener('resize', schedule);
+    owner.addEventListener('scroll', schedule, true);
+    window.visualViewport?.addEventListener('resize', schedule);
+    window.visualViewport?.addEventListener('scroll', schedule);
+    if (element.open) position();
     const onPointerDown = (event: PointerEvent) => {
       const element = details.current;
       if (element?.open && !event.composedPath().includes(element)) close(false);
@@ -56,10 +97,20 @@ export function Menu({ children, actions, onAction, title, className, district, 
     owner.addEventListener('pointerdown', onPointerDown, true);
     owner.addEventListener('keydown', onEscape, true);
     return () => {
+      reposition.current = null;
+      if (frame) window.cancelAnimationFrame(frame);
+      element.removeEventListener('toggle', onToggle);
+      window.removeEventListener('resize', schedule);
+      owner.removeEventListener('scroll', schedule, true);
+      window.visualViewport?.removeEventListener('resize', schedule);
+      window.visualViewport?.removeEventListener('scroll', schedule);
+      if (topLayer && popup.matches(':popover-open')) popup.hidePopover();
+      popup.removeAttribute('popover');
       owner.removeEventListener('pointerdown', onPointerDown, true);
       owner.removeEventListener('keydown', onEscape, true);
     };
   }, [close]);
+  useEffect(() => { reposition.current?.(); }, [actions, title]);
   const toneName = resolveControlTone(tone, district);
   const t = TONE_CLASSES[toneName];
   const bar = ROW_BAR[toneName];
@@ -67,7 +118,7 @@ export function Menu({ children, actions, onAction, title, className, district, 
   return (
     <details ref={details} className={`relative open:z-50 ${className ?? ''}`}>
       <summary className="cursor-pointer list-none">{children}</summary>
-      <View role="menu" className={s.panel()}>
+      <View role="menu" className={s.panel()} style={{ visibility: 'hidden' }}>
         <View aria-hidden className={s.plate()} />
         <View className={s.face()}>
           {title ? (
