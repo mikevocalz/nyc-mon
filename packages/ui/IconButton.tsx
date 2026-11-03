@@ -1,5 +1,6 @@
 'use client';
 import { tv } from 'tailwind-variants';
+import type { ComponentProps } from 'react';
 import { haptics } from './haptics';
 import { PressScale } from './press-scale';
 import { View } from './tw';
@@ -56,8 +57,15 @@ const CUT_FACE = {
 export interface IconButtonProps {
   /** Opt-in rounded corners (rounded-soft) in place of the neon corner cut. Default false: square, cut. */
   rounded?: boolean;
+  /** Explicit frame radius; leaves the legacy rounded/cut defaults unchanged. */
+  cornerRadius?: number;
+  /** Toggle state; omitted for ordinary action buttons. */
+  selected?: boolean;
+  accessibilityState?: ComponentProps<typeof PressScale>['accessibilityState'];
   icon: React.ReactNode;
   'aria-label': string;
+  /** Native accessibility hint; maps to aria-description on web. */
+  accessibilityHint?: string;
   onPress?: () => void;
   className?: string;
   /**
@@ -78,7 +86,7 @@ export interface IconButtonProps {
 }
 
 export function IconButton({
-  icon, onPress, variant, size = 'md', disabled, className, tone: toneProp, district, corner = 'bottom-right', rounded = false, ...a11y
+  icon, onPress, variant, size = 'md', disabled, className, tone: toneProp, district, corner = 'bottom-right', rounded = false, cornerRadius, selected, accessibilityState, ...a11y
 }: IconButtonProps) {
   const { look, tone } = controlLook(variant, toneProp, district);
   const s = iconButton({ look, size, disabled });
@@ -90,7 +98,8 @@ export function IconButton({
     <PressScale
       onPress={disabled ? undefined : () => { haptics.tap(); onPress?.(); }}
       aria-disabled={disabled}
-      accessibilityState={{ disabled: !!disabled }}
+      aria-pressed={selected}
+      accessibilityState={{ ...accessibilityState, disabled: !!disabled, ...(selected === undefined ? {} : { selected }) }}
       // The root carries the icon colour (currentColor) for icons that set none;
       // a caller's own icon class (text-text-muted in nav bars) still wins.
       className={s.root({ className: `${iconColor} ${rounded ? 'rounded-soft' : ''} ${className ?? ''}` })}
@@ -104,7 +113,7 @@ export function IconButton({
         </>
       ) : (
         <CornerCutFrame
-          radius={rounded ? ROUND_RADIUS : 0}
+          radius={cornerRadius ?? (rounded ? ROUND_RADIUS : 0)}
           tone={disabled ? DISABLED_FRAME_TONE : frameTone(look, tone)}
           variant={disabled || look === 'outline' ? 'outline' : 'solid'}
           corner={corner}

@@ -20,3 +20,13 @@ test('button direction resolves to one caller utility after interop and importan
   assert.equal(buttonClassName('flex-row items-center'), 'inline-flex flex-row items-center');
   assert.equal(buttonClassName(), 'inline-flex flex-col');
 });
+
+
+test('RN numeric line heights stay pixels rather than DOM font-size multipliers', () => {
+  const source = Object.freeze({ fontSize: 17, lineHeight: 29, textAlignVertical: 'top' });
+  assert.deepEqual(studioDomStyle(source), { fontSize: 17, lineHeight: '29px' });
+  assert.deepEqual(studioDomStyle({ fontSize: 19, lineHeight: 34 }), { fontSize: 19, lineHeight: '34px' });
+  assert.equal(source.lineHeight, 29);
+  assert.equal(studioDomStyle({ lineHeight: 'normal' }).lineHeight, 'normal');
+  assert.equal(studioDomStyle({ lineHeight: '1.5' }).lineHeight, '1.5');
+});

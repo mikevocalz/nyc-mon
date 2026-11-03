@@ -15,10 +15,22 @@ import { Select as CanonicalSelect } from '../Select';
 import { SegmentedControl } from '../SegmentedControl';
 import { TabBar } from '../TabBar';
 import { DropZone } from '../DropZone';
+import { Button } from '../Button';
+import { IconButton } from '../IconButton';
+import { Banner } from '../Banner';
+import { Badge } from '../Badge';
+import { EmptyState } from '../EmptyState';
+import { KeyValueList } from '../KeyValueList';
+import { ErrorMessage } from '../ErrorMessage';
+import { FieldGroup } from '../FieldGroup';
+import { Card } from '../Card';
+import { Toolbar } from '../Toolbar';
+import { List, ListItem } from '../List';
+import { NightScope } from '../NightScope';
 import { StudioPressable } from './Pressable';
 import type { StudioControls, StudioSelectProps } from './types';
 
-export { StudioPressable, Menu, SegmentedControl, TabBar, DropZone, Page, Main, Header, Footer, Section, Heading, Paragraph, Link };
+export { NightScope, List, ListItem, Card, Toolbar, Button, IconButton, Banner, Badge, EmptyState, KeyValueList, ErrorMessage, FieldGroup, StudioPressable, Menu, SegmentedControl, TabBar, DropZone, Page, Main, Header, Footer, Section, Heading, Paragraph, Link };
 export type { StudioControls, StudioPressableProps, StudioSelectProps } from './types';
 export type { MenuProps, MenuAction } from '../Menu.types';
 export type { DropZoneProps, DropAsset, Assets } from '../DropZone.types';
@@ -52,4 +64,4 @@ export function Image({ source, style, accessibilityLabel, resizeMode, testID, o
 
 /** Pass this stable object to the studio's strict host UI provider. */
 export const html = { Page, Main, Header, Footer, Section, Heading, Paragraph, Link };
-export const studioControls = { View, Text, Pressable: StudioPressable, ScrollView, TextInput, Image, Menu, Select, SegmentedControl, TabBar, DropZone, html } satisfies StudioControls;
+export const studioControls = { NightScope, List, ListItem, Card, Toolbar, Button, IconButton, Banner, Badge, EmptyState, KeyValueList, ErrorMessage, FieldGroup, View, Text, Pressable: StudioPressable, ScrollView, TextInput, Image, Menu, Select, SegmentedControl, TabBar, DropZone, html } satisfies StudioControls;

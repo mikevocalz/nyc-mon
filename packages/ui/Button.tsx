@@ -1,5 +1,5 @@
 'use client';
-import type { ReactNode } from 'react';
+import type { ReactNode, ComponentProps } from 'react';
 import { ActivityIndicator, Platform } from 'react-native';
 import { palette } from '@acme/theme';
 import { PressScale } from './press-scale';
@@ -31,6 +31,11 @@ function labelTone(look: ControlLook, tone: ControlTone) {
 export interface ButtonProps {
   /** Opt-in rounded corners (rounded-soft) in place of the neon corner cut. Default false: square, cut. */
   rounded?: boolean;
+  /** Explicit frame radius; leaves the legacy rounded/cut defaults unchanged. */
+  cornerRadius?: number;
+  /** Toggle state; omitted for ordinary action buttons. */
+  selected?: boolean;
+  accessibilityState?: ComponentProps<typeof PressScale>['accessibilityState'];
   title: string;
   /** A glyph before the label (decorative; the title names the button). Size it to the label. */
   icon?: ReactNode;
@@ -70,7 +75,7 @@ export interface ButtonProps {
 
 export function Button({
   title, icon, onPress, variant, size = 'md', disabled, fullWidth, loading, className,
-  tone: toneProp, district, corner = 'bottom-right', glow = false, rounded = false, testID, ...a11y
+  tone: toneProp, district, corner = 'bottom-right', glow = false, rounded = false, cornerRadius, selected, accessibilityState, testID, ...a11y
 }: ButtonProps) {
   const { look, tone } = controlLook(variant, toneProp, district);
   const off = !!(disabled || loading);
@@ -95,7 +100,8 @@ export function Button({
     <PressScale
       onPress={off ? undefined : () => { haptics.tap(); onPress?.(); }}
       aria-disabled={off}
-      accessibilityState={{ disabled: off }}
+      aria-pressed={selected}
+      accessibilityState={{ ...accessibilityState, disabled: off, ...(selected === undefined ? {} : { selected }) }}
       className={s.root({ className: `${rounded ? 'rounded-soft' : ''} ${className ?? ''}` })}
       outerClassName={fullWidth ? 'w-full' : outerLayout(className)}
       {...a11y}
@@ -109,7 +115,7 @@ export function Button({
         </>
       ) : (
         <CornerCutFrame
-          radius={rounded ? ROUND_RADIUS : 0}
+          radius={cornerRadius ?? (rounded ? ROUND_RADIUS : 0)}
           tone={off ? DISABLED_FRAME_TONE : care ? palette.signage.black : frameTone(look, tone)}
           variant={off || look === 'outline' ? 'outline' : 'solid'}
           corner={corner}

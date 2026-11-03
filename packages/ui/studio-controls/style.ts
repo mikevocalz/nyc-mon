@@ -5,8 +5,11 @@
  */
 export function studioDomStyle(input: Readonly<Record<string, unknown>>): Record<string, unknown> {
   const { paddingHorizontal, paddingVertical, marginHorizontal, marginVertical,
-    textAlignVertical, ...rest } = input;
+    textAlignVertical, lineHeight, ...rest } = input;
   const style: Record<string, unknown> = { ...rest };
+  // RN numbers are pixel heights; React DOM treats numeric lineHeight as a
+  // unitless font-size multiplier, unlike fontSize and most geometry fields.
+  if (lineHeight !== undefined) style.lineHeight = typeof lineHeight === 'number' ? `${lineHeight}px` : lineHeight;
   if (paddingHorizontal !== undefined) { style.paddingLeft ??= paddingHorizontal; style.paddingRight ??= paddingHorizontal; }
   if (paddingVertical !== undefined) { style.paddingTop ??= paddingVertical; style.paddingBottom ??= paddingVertical; }
   if (marginHorizontal !== undefined) { style.marginLeft ??= marginHorizontal; style.marginRight ??= marginHorizontal; }

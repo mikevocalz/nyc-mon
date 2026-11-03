@@ -1,6 +1,7 @@
 'use client';
 import type { ReactNode } from 'react';
 import { tv } from 'tailwind-variants';
+import { TYPE_SCALE_TV } from './type-scale';
 import { Nav } from './primitives';
 import { Link } from './html';
 import { View, Text, Pressable } from './tw';
@@ -32,13 +33,24 @@ const tabBar = tv({
   variants: {
     // Active chip parts read the tone table: face, plate step, ink on the face.
     tone: toneVariants((c) => ({ keyline: c.face, emphasisLabel: c.text, plate: c.plate, faceOn: c.face, labelOn: c.onFace })),
+    density: {
+      navigation: {},
+      compact: {
+        root: 'min-w-0', keyline: 'hidden',
+        row: 'min-w-0 gap-0 border-t-0 p-0 md:px-0',
+        tab: 'min-h-11 min-w-11 px-0',
+        chip: 'w-full min-w-0 md:min-w-0', plate: 'hidden',
+        face: 'w-full min-w-0 flex-row gap-1 px-1 py-1 md:gap-1 md:px-1',
+        label: 'min-w-0 shrink font-sans text-type-caption md:text-type-caption',
+      },
+    },
     active: {
       true: { face: '' },
       false: { face: 'group-hover:bg-ink-800', label: 'text-silver-300' },
     },
   },
-  defaultVariants: { active: false },
-});
+  defaultVariants: { active: false, density: 'navigation' },
+}, TYPE_SCALE_TV);
 
 /** State handed to an icon render function, so the glyph can match the chip. */
 export interface TabIconState {
@@ -76,24 +88,27 @@ export interface TabBarProps {
    * section is not switching a tab panel.
    */
   semantics?: 'tabs' | 'navigation';
+  /** Compact pane tabs keep 44pt targets without screen-width navigation spacing. */
+  density?: 'navigation' | 'compact';
+  'aria-label'?: string;
   className?: string;
 }
 
 const renderIcon = (icon: TabBarTab['icon'], state: TabIconState) =>
   typeof icon === 'function' ? icon(state) : icon;
 
-export function TabBar({ tabs, emphasizedKey, tone: toneProp, district, semantics = 'tabs', className }: TabBarProps) {
+export function TabBar({ tabs, emphasizedKey, tone: toneProp, district, semantics = 'tabs', density = 'navigation', 'aria-label': ariaLabel = 'Main navigation', className }: TabBarProps) {
   const tone = resolveControlTone(toneProp, district);
   const onFace = TONE_CLASSES[tone].onFace;
-  const s = tabBar({ tone });
+  const s = tabBar({ tone, density });
   const navMode = semantics === 'navigation';
   return (
-    <Nav role={navMode ? undefined : 'tablist'} aria-label="Main navigation" className={s.root({ className })}>
+    <Nav role={navMode ? undefined : 'tablist'} aria-label={ariaLabel} className={s.root({ className })}>
       <View aria-hidden className={s.keyline()} />
       <View className={s.row()}>
         {tabs.map((tab) => {
           const active = !!tab.active;
-          const emphasized = tab.key === emphasizedKey;
+          const emphasized = density === 'navigation' && tab.key === emphasizedKey;
           const body = emphasized ? (
                 <View className={s.emphasis()}>
                   <CornerCutFrame tone={toneInput(tone)} cut={12} depth={4} glow={active ? 'low' : false} className="h-12 w-14 items-center justify-center">
@@ -106,7 +121,7 @@ export function TabBar({ tabs, emphasizedKey, tone: toneProp, district, semantic
               {active ? <View aria-hidden className={s.plate()} /> : null}
               <View className={s.face({ active, className: active ? s.faceOn() : undefined })}>
                 {renderIcon(tab.icon, { active, colorClass: active ? onFace : 'text-silver-300' })}
-                <Text className={s.label({ active, className: active ? s.labelOn() : undefined })}>{tab.label}</Text>
+                <Text numberOfLines={density === 'compact' ? 1 : undefined} className={s.label({ active, className: active ? s.labelOn() : undefined })}>{tab.label}</Text>
               </View>
             </View>
           );

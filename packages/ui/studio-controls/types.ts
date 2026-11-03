@@ -15,6 +15,19 @@ export interface StudioSelectProps {
 }
 /** Portable visual boundary. Runtime behavior stays in this canonical UI package. */
 export interface StudioControls {
+  NightScope: typeof import('../NightScope')['NightScope'];
+  List: typeof import('../List')['List'];
+  ListItem: typeof import('../List')['ListItem'];
+  Card: typeof import('../Card')['Card'];
+  Toolbar: typeof import('../Toolbar')['Toolbar'];
+  Button: typeof import('../Button')['Button'];
+  IconButton: typeof import('../IconButton')['IconButton'];
+  Banner: typeof import('../Banner')['Banner'];
+  Badge: typeof import('../Badge')['Badge'];
+  EmptyState: typeof import('../EmptyState')['EmptyState'];
+  KeyValueList: typeof import('../KeyValueList')['KeyValueList'];
+  ErrorMessage: typeof import('../ErrorMessage')['ErrorMessage'];
+  FieldGroup: typeof import('../FieldGroup')['FieldGroup'];
   View: ComponentType<ViewProps>;
   Text: ComponentType<TextProps>;
   Pressable: ComponentType<StudioPressableProps>;

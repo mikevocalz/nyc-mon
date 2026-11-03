@@ -1,4 +1,5 @@
 import { tv } from 'tailwind-variants';
+import { TYPE_SCALE_TV } from './type-scale';
 import { Header, Nav } from './primitives';
 import { View, Text } from './tw';
 import { resolveControlTone, toneVariants, type ControlTone, type District } from './district';
@@ -21,8 +22,16 @@ const toolbar = tv({
   },
   variants: {
     tone: toneVariants((c) => ({ cornice: c.face, plate: c.plate })),
+    density: {
+      default: {},
+      compact: {
+        row: 'min-h-13 h-auto min-w-0 px-2 md:h-auto md:px-2',
+        title: 'min-w-0 font-sans text-type-caption md:text-type-caption',
+      },
+    },
   },
-});
+  defaultVariants: { density: 'default' },
+}, TYPE_SCALE_TV);
 
 export interface ToolbarProps {
   title?: string;
@@ -32,11 +41,13 @@ export interface ToolbarProps {
   tone?: ControlTone;
   /** Theme by neighbourhood. Default midtown (orange). */
   district?: District;
+  /** Pane-friendly spacing without device-wide desktop height escalation. */
+  density?: 'default' | 'compact';
   className?: string;
 }
 
-export function Toolbar({ title, leading, actions, tone, district, className }: ToolbarProps) {
-  const s = toolbar({ tone: resolveControlTone(tone, district) });
+export function Toolbar({ title, leading, actions, tone, district, density = 'default', className }: ToolbarProps) {
+  const s = toolbar({ tone: resolveControlTone(tone, district), density });
   return (
     <Header aria-label={title} className={s.root({ className })}>
       <View className={s.row()}>
