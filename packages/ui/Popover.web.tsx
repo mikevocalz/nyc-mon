@@ -18,6 +18,8 @@ export function Popover({
   const { width, height } = useWindowDimensions();
   const regions = useReservedRegions();
   const sheet = popoverVessel({ width, height, regions }) === 'sheet';
+  const callback = useRef(onOpenChange);
+  callback.current = onOpenChange;
   const root = useRef<HTMLDivElement>(null);
   const panel = useRef<HTMLDivElement>(null);
   const focusAfterClose = useRef(false);
@@ -86,14 +88,14 @@ export function Popover({
     const outside = (event: PointerEvent) => {
       const path = event.composedPath();
       if (path.includes(triggerBox) || path.includes(element)) return;
-      onOpenChange(false);
+      callback.current(false);
     };
     const escape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       event.preventDefault();
       event.stopPropagation();
       focusAfterClose.current = true;
-      onOpenChange(false);
+      callback.current(false);
     };
     owner.addEventListener('pointerdown', outside, true);
     owner.addEventListener('keydown', escape, true);
@@ -119,7 +121,7 @@ export function Popover({
       if (topLayer && element.matches(':popover-open')) element.hidePopover();
       element.removeAttribute('popover');
     };
-  }, [floating, onOpenChange, placement]);
+  }, [floating, placement]);
 
   return (
     <>
