@@ -1,5 +1,6 @@
 'use client';
 import { tv } from 'tailwind-variants';
+import { TYPE_SCALE_TV } from './type-scale';
 import { View, Text } from './tw';
 import { Info, TriangleAlert, Check } from './icons';
 import type { ReactNode } from 'react';
@@ -21,6 +22,10 @@ const banner = tv({
     action: 'mt-1 self-start',
   },
   variants: {
+    appearance: {
+      default: {},
+      studio: { root: 'border rounded-[4px] gap-2 px-3 py-2.5', title: 'font-sans font-medium text-[13px] leading-snug', description: 'font-sans text-[12px] leading-snug' },
+    },
     tone: {
       info: { root: 'border-info bg-surface-raised', icon: 'text-info', title: 'text-text', description: 'text-text-secondary' },
       success: { root: 'border-success bg-surface-raised', icon: 'text-success', title: 'text-text', description: 'text-text-secondary' },
@@ -28,12 +33,14 @@ const banner = tv({
       neutral: { root: 'border-border bg-surface-sunken', icon: 'text-text-muted', title: 'text-text', description: 'text-text-secondary' },
     },
   },
-  defaultVariants: { tone: 'neutral' },
-});
+  defaultVariants: { tone: 'neutral', appearance: 'default' },
+}, TYPE_SCALE_TV);
 
 const TONE_ICON = { info: Info, success: Check, danger: TriangleAlert, neutral: Info } as const;
 
 export interface BannerProps {
+  /** Subtle document-editor feedback; tone and live-region semantics are retained. */
+  appearance?: 'default' | 'studio';
   tone: 'info' | 'danger' | 'success' | 'neutral';
   title: string;
   description?: string;
@@ -46,8 +53,8 @@ export interface BannerProps {
   className?: string;
 }
 
-export function Banner({ tone, title, description, action, live = 'status', className }: BannerProps) {
-  const s = banner({ tone });
+export function Banner({ tone, title, description, action, live = 'status', appearance = 'default', className }: BannerProps) {
+  const s = banner({ tone, appearance });
   const Icon = TONE_ICON[tone];
   return (
     <View role={live} className={s.root({ className })}>

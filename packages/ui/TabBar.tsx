@@ -36,12 +36,13 @@ const tabBar = tv({
     density: {
       navigation: {},
       compact: {
-        root: 'min-w-0', keyline: 'hidden',
+        root: 'min-w-0 bg-[#292B30]', keyline: 'hidden',
         row: 'min-w-0 gap-0 border-t-0 p-0 md:px-0',
         tab: 'min-h-11 min-w-11 px-0',
         chip: 'w-full min-w-0 md:min-w-0', plate: 'hidden',
         face: 'w-full min-w-0 flex-row gap-1 px-1 py-1 md:gap-1 md:px-1',
-        label: 'min-w-0 shrink font-sans text-type-caption md:text-type-caption',
+        label: 'min-w-0 shrink font-sans font-medium text-type-caption md:text-type-caption',
+        faceOn: 'bg-[#3B414A] border-b-2 border-[#75B9EE]', labelOn: 'text-[#EFF1F4]',
       },
     },
     active: {

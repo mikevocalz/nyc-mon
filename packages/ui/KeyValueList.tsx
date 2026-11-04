@@ -1,5 +1,6 @@
 'use client';
 import { tv } from 'tailwind-variants';
+import { TYPE_SCALE_TV } from './type-scale';
 import { DescriptionDetails, DescriptionList, DescriptionTerm } from './primitives';
 import { View } from './tw';
 import { Badge } from './Badge';
@@ -24,6 +25,7 @@ const kv = tv({
     action: 'shrink-0',
   },
   variants: {
+    appearance: { default: {}, studio: { grid: 'gap-x-4 gap-y-3', term: 'font-sans text-[12px] text-[#AEB3BD]', details: 'font-sans text-[13px] text-[#E4E7EC]' } },
     columns: {
       1: { grid: 'flex-col' },
       // The measured pane owns the breakpoint, independently of the viewport.
@@ -34,8 +36,8 @@ const kv = tv({
       night: { term: 'text-silver-400', details: 'text-silver-100' },
     },
   },
-  defaultVariants: { columns: 1, surface: 'page' },
-});
+  defaultVariants: { columns: 1, surface: 'page', appearance: 'default' },
+}, TYPE_SCALE_TV);
 
 export interface KeyValueItem {
   key: string;
@@ -47,6 +49,8 @@ export interface KeyValueItem {
 }
 
 export interface KeyValueListProps {
+  /** Compact document-inspector type, shared by web and native. */
+  appearance?: 'default' | 'studio';
   items: readonly KeyValueItem[];
   /** Two columns from 600 px pane width; the prop caps it at one. Default 2. */
   columns?: 1 | 2;
@@ -55,11 +59,11 @@ export interface KeyValueListProps {
   className?: string;
 }
 
-export function KeyValueList({ items, columns = 2, surface = 'page', className }: KeyValueListProps) {
+export function KeyValueList({ items, columns = 2, surface = 'page', appearance = 'default', className }: KeyValueListProps) {
   // Start with one column for SSR and until this instance is measured.
   const { size, onLayout } = useLayoutSize({ width: 0, height: 0 });
   const resolvedColumns = keyValueListColumns(size.width, columns);
-  const s = kv({ columns: resolvedColumns, surface });
+  const s = kv({ columns: resolvedColumns, surface, appearance });
   return (
     <View className={s.root({ className })}>
       {/* Measure usable content, excluding padding supplied on the root. */}

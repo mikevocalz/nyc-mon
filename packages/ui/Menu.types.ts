@@ -10,6 +10,8 @@ export interface MenuAction {
 }
 
 export interface MenuProps {
+  /** Web editor facade; native menus retain the operating system appearance. */
+  appearance?: 'default' | 'studio';
   /** The control the menu is anchored to. */
   children: ReactNode;
   actions: readonly MenuAction[];

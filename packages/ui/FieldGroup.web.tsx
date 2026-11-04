@@ -1,5 +1,6 @@
 'use client';
 import { tv } from 'tailwind-variants';
+import { TYPE_SCALE_TV } from './type-scale';
 import { View } from './tw';
 import { Text } from './Text';
 import { Heading } from './html';
@@ -22,16 +23,18 @@ const section = tv({
   },
   variants: {
     tone: toneVariants((c) => ({ cap: c.face, title: c.text })),
+    appearance: { default: {}, studio: { root: `${NIGHT_SCHEME} border-0 bg-transparent`, cap: 'hidden', header: 'border-b border-[#45474D] px-3 py-3', title: 'font-sans font-medium text-type-caption md:text-type-caption tracking-normal text-[#D8DBE0]', body: 'gap-3 p-3' } },
     uppercase: { true: { title: 'uppercase' } },
   },
-});
+  defaultVariants: { appearance: 'default' },
+}, TYPE_SCALE_TV);
 
 export function FieldGroup({ children }: FieldGroupProps) {
   return <View className="gap-6">{children}</View>;
 }
 
-FieldGroup.Section = function FieldSection({ children, title, titleUppercase = false, tone, district }: FieldSectionProps) {
-  const s = section({ tone: resolveControlTone(tone, district), uppercase: titleUppercase });
+FieldGroup.Section = function FieldSection({ children, title, titleUppercase = false, tone, district, appearance = 'default' }: FieldSectionProps) {
+  const s = section({ tone: resolveControlTone(tone, district), uppercase: titleUppercase, appearance });
   return (
     <NightScope>
       <View role="group" aria-label={title} className={s.root()}>

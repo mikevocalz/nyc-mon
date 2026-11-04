@@ -6,6 +6,8 @@ export interface FieldGroupProps {
 }
 
 export interface FieldSectionProps {
+  /** Quiet document-inspector styling; default retains the branded section. */
+  appearance?: 'default' | 'studio';
   children?: ReactNode;
   /** Section heading, set in the display face in the panel's header strip. */
   title?: string;
