@@ -79,7 +79,20 @@ export function Popover({
       if (frame) return;
       frame = view.requestAnimationFrame(() => { frame = 0; position(); });
     };
+    const reducedMotion = view.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    // A restrained optical arrival, only for the web top layer. Native SwiftUI
+    // and Compose own their own motion; do not animate the instrument contents.
+    element.style.opacity = reducedMotion ? '1' : '0';
+    element.style.transform = reducedMotion ? 'none' : 'translateY(5px) scale(0.985)';
+    element.style.transformOrigin = 'top right';
+    element.style.transition = reducedMotion
+      ? 'none'
+      : 'opacity 150ms cubic-bezier(0.2, 0.8, 0.2, 1), transform 150ms cubic-bezier(0.2, 0.8, 0.2, 1)';
     position();
+    const entranceFrame = view.requestAnimationFrame(() => {
+      element.style.opacity = '1';
+      element.style.transform = 'none';
+    });
     const resizeObserver = typeof view.ResizeObserver === 'function'
       ? new view.ResizeObserver(schedule) : null;
     resizeObserver?.observe(triggerBox);
@@ -110,6 +123,7 @@ export function Popover({
     );
     (first ?? element).focus();
     return () => {
+      view.cancelAnimationFrame(entranceFrame);
       if (frame) view.cancelAnimationFrame(frame);
       resizeObserver?.disconnect();
       owner.removeEventListener('pointerdown', outside, true);
