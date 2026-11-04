@@ -4,6 +4,7 @@ import { DescriptionDetails, DescriptionList, DescriptionTerm } from './primitiv
 import { View } from './tw';
 import { Badge } from './Badge';
 import { useLayoutSize } from './use-layout-size';
+import { keyValueListColumns, keyValuePairClassName } from './key-value-list-layout';
 import type { ReactNode } from 'react';
 
 /**
@@ -16,8 +17,8 @@ import type { ReactNode } from 'react';
 const kv = tv({
   slots: {
     root: 'w-full flex-col',
-    grid: 'w-full gap-x-8 gap-y-4',
-    pair: 'flex-col gap-0.5',
+    grid: 'w-full gap-y-4',
+    pair: 'box-border min-w-0 flex-col gap-0.5',
     term: 'text-sm text-text-muted',
     details: 'flex-row items-center gap-2 text-base text-text',
     action: 'shrink-0',
@@ -25,8 +26,8 @@ const kv = tv({
   variants: {
     columns: {
       1: { grid: 'flex-col' },
-      // CSS columns so a pair can break to the second column, never inside itself.
-      2: { grid: 'md:flex-row md:flex-wrap' },
+      // The measured pane owns the breakpoint, independently of the viewport.
+      2: { grid: 'flex-row flex-wrap' },
     },
     surface: {
       page: {},
@@ -47,7 +48,7 @@ export interface KeyValueItem {
 
 export interface KeyValueListProps {
   items: readonly KeyValueItem[];
-  /** Two columns above 600 px pane width; the prop caps it at one. Default 2. */
+  /** Two columns from 600 px pane width; the prop caps it at one. Default 2. */
   columns?: 1 | 2;
   /** 'page' (default) follows the scheme; 'night' is the night facade. */
   surface?: 'page' | 'night';
@@ -55,30 +56,35 @@ export interface KeyValueListProps {
 }
 
 export function KeyValueList({ items, columns = 2, surface = 'page', className }: KeyValueListProps) {
-  const { size, onLayout } = useLayoutSize({ width: 1024, height: 1 });
-  const s = kv({ columns: columns === 2 && size.width >= 600 ? 2 : 1, surface });
+  // Start with one column for SSR and until this instance is measured.
+  const { size, onLayout } = useLayoutSize({ width: 0, height: 0 });
+  const resolvedColumns = keyValueListColumns(size.width, columns);
+  const s = kv({ columns: resolvedColumns, surface });
   return (
-    <View onLayout={onLayout} className={s.root({ className })}>
-      <DescriptionList className={s.grid()}>
-        {items.map((item) => (
-          <View
-            key={item.key}
-            className={`${s.pair()} ${columns === 2 && size.width >= 600 ? 'w-[calc(50%-1rem)]' : ''}`}
-            // CSS break-inside keeps a pair whole across columns and fold segments.
-            style={{ breakInside: 'avoid' } as object}
-          >
-            <DescriptionTerm className={s.term()}>{item.label}</DescriptionTerm>
-            <DescriptionDetails className={s.details()}>
-              {item.value === null || item.value === undefined ? (
-                <Badge label="TODO(canon)" tone="neutral" />
-              ) : (
-                item.value
-              )}
-              {item.action ? <View className={s.action()}>{item.action}</View> : null}
-            </DescriptionDetails>
-          </View>
-        ))}
-      </DescriptionList>
+    <View className={s.root({ className })}>
+      {/* Measure usable content, excluding padding supplied on the root. */}
+      <View onLayout={onLayout} className="w-full">
+        <DescriptionList className={s.grid()}>
+          {items.map((item, index) => (
+            <View
+              key={item.key}
+              className={s.pair({ className: keyValuePairClassName(resolvedColumns, index) })}
+              // CSS break-inside keeps a pair whole across columns and fold segments.
+              style={{ breakInside: 'avoid' } as object}
+            >
+              <DescriptionTerm className={s.term()}>{item.label}</DescriptionTerm>
+              <DescriptionDetails className={s.details()}>
+                {item.value === null || item.value === undefined ? (
+                  <Badge label="TODO(canon)" tone="neutral" />
+                ) : (
+                  item.value
+                )}
+                {item.action ? <View className={s.action()}>{item.action}</View> : null}
+              </DescriptionDetails>
+            </View>
+          ))}
+        </DescriptionList>
+      </View>
     </View>
   );
 }
