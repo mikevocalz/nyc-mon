@@ -76,6 +76,8 @@ export interface PressBaseProps extends P {
   'aria-label'?: string;
   'aria-disabled'?: boolean;
   'aria-checked'?: boolean;
+  /** Selection state for native-style listbox options. */
+  'aria-selected'?: boolean;
   /** Disclosure state of native menus/popovers on the real browser button. */
   'aria-expanded'?: boolean;
   'aria-haspopup'?: boolean | 'dialog' | 'menu' | 'listbox' | 'grid' | 'tree';
