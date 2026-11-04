@@ -42,7 +42,7 @@ export function PopoverTrigger({
 }) {
   return (
     <Pressable
-      accessibilityRole="button"
+      role="button"
       accessibilityLabel={label}
       aria-expanded={expanded}
       aria-haspopup="dialog"
