@@ -1,0 +1,30 @@
+name: Native Expressive Dropdown contracts
+
+on:
+  pull_request:
+    paths:
+      - 'packages/ui/NativeDropdown.*'
+      - 'packages/ui/index.ts'
+      - 'packages/ui/html/dom.web.tsx'
+      - '.github/workflows/native-dropdown-contracts.yml'
+  push:
+    branches:
+      - feat/ui-material3-expressive-dropdowns-2026-11-04
+    paths:
+      - 'packages/ui/NativeDropdown.*'
+      - '.github/workflows/native-dropdown-contracts.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deterministic-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+      - run: node --experimental-strip-types --test packages/ui/NativeDropdown.model.test.ts
