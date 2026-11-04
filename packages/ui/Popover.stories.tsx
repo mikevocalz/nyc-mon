@@ -5,7 +5,17 @@ import { Text, View } from './tw';
 import { ReservedRegionsOverride } from './reserved-regions-override';
 import { useInstanceStore, useStore } from './use-instance-store';
 
-const meta = { title: 'UI/Popover', component: Popover } satisfies Meta<typeof Popover>;
+const meta = {
+  title: 'UI/Popover',
+  component: Popover,
+  args: {
+    open: false,
+    onOpenChange: () => {},
+    trigger: <Text>Brush settings</Text>,
+    children: <Text>Interactive fixture</Text>,
+    accessibleLabel: 'Brush settings',
+  },
+} satisfies Meta<typeof Popover>;
 export default meta;
 type Story = StoryObj<typeof meta>;
 
