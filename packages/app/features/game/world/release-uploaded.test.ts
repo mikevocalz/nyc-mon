@@ -178,3 +178,36 @@ test('the trap sees a read of a released array', async () => {
     trap.uninstall();
   }
 });
+
+test('preparation releases only copied geometry and preserves pixels until real rendering', async () => {
+  const {renderer,scene,camera,record}=await setup();
+  const geometry=new THREE.BoxGeometry(),texture=new THREE.DataTexture(new Uint8Array(16).fill(255),2,2);
+  texture.needsUpdate=true;
+  const material=new THREE.MeshBasicNodeMaterial({map:texture});
+  scene.add(new THREE.Mesh(geometry,material));
+  const releaseProgress=(await import('../compile-progress-event.ts')).withCompileProgressEvent();
+  try {
+    await renderer.compileAsync(scene,camera);
+    const pixels=texture.image.data;
+    const early=createUploadedReleaser(scene,{settleFrames:1,textures:false});
+    assert.ok(early.release(backendUploaded(renderer))>0);
+    assert.equal(geometry.attributes.position!.array.length,0);
+    assert.equal(texture.image.data,pixels);
+    const buffer=(renderer.backend as unknown as {get(o:object):{buffer:unknown}}).get(geometry.attributes.position!).buffer;
+    renderer.render(scene,camera);
+    assert.equal((renderer.backend as unknown as {get(o:object):{buffer:unknown}}).get(geometry.attributes.position!).buffer,buffer,'first draw reuses the compiled static geometry');
+    assert.equal(texture.image.data,pixels,'geometry cleanup does not discard texture data');
+  } finally {releaseProgress();geometry.dispose();material.dispose();texture.dispose();await renderer.dispose();}
+});
+
+test('a versioned placeholder texture never qualifies as uploaded pixels',()=>{
+  const texture={isTexture:true,version:1};
+  const state={initialized:true,isDefaultTexture:true,version:1};
+  const renderer={backend:{has:()=>true,get:()=>({texture:{}})},_textures:{get:()=>state}};
+  const uploaded=backendUploaded(renderer);
+  assert.equal(uploaded(texture),false);
+  state.isDefaultTexture=false;state.version=0;
+  assert.equal(uploaded(texture),false,'an older upload cannot release newer pixels');
+  state.version=1;assert.equal(uploaded(texture),true);
+  state.initialized=false;assert.equal(uploaded(texture),false);
+});

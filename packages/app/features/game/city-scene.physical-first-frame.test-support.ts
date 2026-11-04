@@ -41,6 +41,7 @@ export interface FirstFrame {
   secondFrameWriteBytes: number;
   /** Upload bytes of the late shadow-pass frames (lazyShadows). */
   lateWriteBytes: number;
+  shadowMapAllocated: boolean;
   /** Wall-clock milliseconds of the first frame (update, node frame, render): all of it synchronous JS on this thread. */
   frame0Ms: number;
   /** Process CPU milliseconds (user + system) over the same span. */
@@ -228,6 +229,7 @@ export async function measureFirstFrame(options: MeasureOptions = {}): Promise<F
   let retainedNeverUploaded = 0;
   for (const b of neverUploaded) retainedNeverUploaded += b.byteLength;
   trap.resume();
+  if (process.env.NYCMON_TEXTURE_AUDIT === '1') console.log('[texture-allocations]', JSON.stringify(record.textures));
   const settled = {
     shaderModules: record.shaders.length,
     distinctShaderModules: new Set(record.shaders).size,
@@ -270,6 +272,7 @@ export async function measureFirstFrame(options: MeasureOptions = {}): Promise<F
     secondFrameDraws: settled.draws,
     secondFrameWriteBytes: settled.writeBytes,
     lateWriteBytes,
+    shadowMapAllocated: record.textures.some(texture => texture.label === 'SunShadowDepthTexture'),
     frame0Ms,
     frame0CpuMs,
     frame0AllocatedBytes,

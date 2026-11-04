@@ -1,8 +1,7 @@
 diff --git a/examples/jsm/lights/SunShadowNode.js b/examples/jsm/lights/SunShadowNode.js
-index 3d54054..3c17a46 100644
 --- a/examples/jsm/lights/SunShadowNode.js
 +++ b/examples/jsm/lights/SunShadowNode.js
-@@ -10,7 +10,7 @@ import {
+@@ -10,7 +10,7 @@
  	Vector2,
  	VSMShadowMap
  } from 'three/webgpu';
@@ -11,7 +10,7 @@ index 3d54054..3c17a46 100644
  
  let _vsmWarned = false;
  
-@@ -123,7 +123,7 @@ class SunShadowNode extends ShadowNode {
+@@ -123,7 +123,7 @@
  		// evaluated outside the cascade branches so nodes shared with the rest of
  		// the shader, like the world normal, are not trapped in a branch scope
  
@@ -21,6 +20,8 @@ index 3d54054..3c17a46 100644
  
  		const shadowValue = float( 1 ).toVar( 'shadowValue' );
 diff --git a/build/three.webgpu.js b/build/three.webgpu.js
+--- a/build/three.webgpu.js
++++ b/build/three.webgpu.js
 @@ -10770,8 +10770,12 @@
  
  			texture.removeEventListener( 'dispose', textureData.onDispose );
@@ -45,7 +46,107 @@ diff --git a/build/three.webgpu.js b/build/three.webgpu.js
  
  			bindGroup = this.renderer._bindings.getSharedBindGroup( bindGroup );
  
+@@ -18215,7 +18219,7 @@
+ 	 */
+ 	_createNodeBuilderState( nodeBuilder ) {
+ 
+-		return new NodeBuilderState(
++		const state = new NodeBuilderState(
+ 			nodeBuilder.vertexShader,
+ 			nodeBuilder.fragmentShader,
+ 			nodeBuilder.computeShader,
+@@ -18228,6 +18232,19 @@
+ 			nodeBuilder.hardwareClipping,
+ 			nodeBuilder.transforms
+ 		);
++
++
++		// Shader callbacks can retain this builder. Runtime bindings and update nodes
++		// now belong to state; analysis/generation scratch must not live with them.
++		nodeBuilder.cache.nodesData = new WeakMap();
++		nodeBuilder.globalCache.nodesData = new WeakMap();
++		nodeBuilder.flowsData = new WeakMap();
++		nodeBuilder.nodes.clear();
++		nodeBuilder.sequentialNodes.clear();
++		nodeBuilder.hashNodes = {};
++		nodeBuilder.flowNodes = { vertex: [], fragment: [], compute: [] };
++
++		return state;
+ 
+ 	}
+ 
+@@ -23542,6 +23559,28 @@
+ 			precompilationState.materialSide = item.material.side;
+ 			item.material.side = item.side;
+ 
++			// Override passes build source-specific alpha/position nodes and cache keys.
++			// Preserve that source across async work and restore it before each yield.
++			precompilationState.previousSourceMaterial = this._currentSourceMaterial;
++			this._currentSourceMaterial = item.sourceMaterial;
++
++			if ( item.overrideMaterialState !== null ) {
++
++				precompilationState.previousOverrideMaterialState = {
++					colorNode: item.material.colorNode,
++					depthNode: item.material.depthNode,
++					positionNode: item.material.positionNode,
++					alphaMap: item.material.alphaMap,
++					transparent: item.material.transparent,
++					displacementMap: item.material.displacementMap,
++					displacementScale: item.material.displacementScale,
++					displacementBias: item.material.displacementBias,
++					_alphaTest: item.material._alphaTest,
++				};
++				Object.assign( item.material, item.overrideMaterialState );
++
++			}
++
+ 		}
+ 
+ 		this._callDepth ++;
+@@ -23563,12 +23602,18 @@
+ 	 */
+ 	_finishPreCompile() {
+ 
+-		const { useFrameBufferTarget, outputRenderTarget, activeCubeFace, activeMipmapLevel, outputMRT, previousRenderContext, item, materialSide } = this._precompilationState;
++		const { useFrameBufferTarget, outputRenderTarget, activeCubeFace, activeMipmapLevel, outputMRT, previousRenderContext, item, materialSide, previousSourceMaterial } = this._precompilationState;
+ 
+ 		if ( useFrameBufferTarget === true ) this.setRenderTarget( outputRenderTarget, activeCubeFace, activeMipmapLevel );
+ 		this.setMRT( outputMRT );
+ 
+-		if ( item !== null ) item.material.side = materialSide;
++		if ( item !== null ) {
++
++			item.material.side = materialSide;
++			this._currentSourceMaterial = previousSourceMaterial;
++			if ( item.overrideMaterialState !== null ) Object.assign( item.material, this._precompilationState.previousOverrideMaterialState );
++
++		}
+ 
+ 		this._currentRenderContext = previousRenderContext;
+ 
+@@ -26365,6 +26410,18 @@
+ 			this._compilationPromises.push( {
+ 				object,
+ 				material,
++				sourceMaterial: this._currentSourceMaterial,
++				overrideMaterialState: this._currentSourceMaterial !== null ? {
++					colorNode: material.colorNode,
++					depthNode: material.depthNode,
++					positionNode: material.positionNode,
++					alphaMap: material.alphaMap,
++					transparent: material.transparent,
++					displacementMap: material.displacementMap,
++					displacementScale: material.displacementScale,
++					displacementBias: material.displacementBias,
++					_alphaTest: material._alphaTest,
++				} : null,
+ 				side: material.side,
+ 				scene,
+ 				camera,
 diff --git a/build/three.webgpu.nodes.js b/build/three.webgpu.nodes.js
+--- a/build/three.webgpu.nodes.js
++++ b/build/three.webgpu.nodes.js
 @@ -37304,8 +37304,12 @@
  
  			texture.removeEventListener( 'dispose', textureData.onDispose );
@@ -70,7 +171,107 @@ diff --git a/build/three.webgpu.nodes.js b/build/three.webgpu.nodes.js
  
  			bindGroup = this.renderer._bindings.getSharedBindGroup( bindGroup );
  
+@@ -59417,7 +59421,7 @@
+ 	 */
+ 	_createNodeBuilderState( nodeBuilder ) {
+ 
+-		return new NodeBuilderState(
++		const state = new NodeBuilderState(
+ 			nodeBuilder.vertexShader,
+ 			nodeBuilder.fragmentShader,
+ 			nodeBuilder.computeShader,
+@@ -59430,6 +59434,19 @@
+ 			nodeBuilder.hardwareClipping,
+ 			nodeBuilder.transforms
+ 		);
++
++
++		// Shader callbacks can retain this builder. Runtime bindings and update nodes
++		// now belong to state; analysis/generation scratch must not live with them.
++		nodeBuilder.cache.nodesData = new WeakMap();
++		nodeBuilder.globalCache.nodesData = new WeakMap();
++		nodeBuilder.flowsData = new WeakMap();
++		nodeBuilder.nodes.clear();
++		nodeBuilder.sequentialNodes.clear();
++		nodeBuilder.hashNodes = {};
++		nodeBuilder.flowNodes = { vertex: [], fragment: [], compute: [] };
++
++		return state;
+ 
+ 	}
+ 
+@@ -64744,6 +64761,28 @@
+ 			precompilationState.materialSide = item.material.side;
+ 			item.material.side = item.side;
+ 
++			// Override passes build source-specific alpha/position nodes and cache keys.
++			// Preserve that source across async work and restore it before each yield.
++			precompilationState.previousSourceMaterial = this._currentSourceMaterial;
++			this._currentSourceMaterial = item.sourceMaterial;
++
++			if ( item.overrideMaterialState !== null ) {
++
++				precompilationState.previousOverrideMaterialState = {
++					colorNode: item.material.colorNode,
++					depthNode: item.material.depthNode,
++					positionNode: item.material.positionNode,
++					alphaMap: item.material.alphaMap,
++					transparent: item.material.transparent,
++					displacementMap: item.material.displacementMap,
++					displacementScale: item.material.displacementScale,
++					displacementBias: item.material.displacementBias,
++					_alphaTest: item.material._alphaTest,
++				};
++				Object.assign( item.material, item.overrideMaterialState );
++
++			}
++
+ 		}
+ 
+ 		this._callDepth ++;
+@@ -64765,12 +64804,18 @@
+ 	 */
+ 	_finishPreCompile() {
+ 
+-		const { useFrameBufferTarget, outputRenderTarget, activeCubeFace, activeMipmapLevel, outputMRT, previousRenderContext, item, materialSide } = this._precompilationState;
++		const { useFrameBufferTarget, outputRenderTarget, activeCubeFace, activeMipmapLevel, outputMRT, previousRenderContext, item, materialSide, previousSourceMaterial } = this._precompilationState;
+ 
+ 		if ( useFrameBufferTarget === true ) this.setRenderTarget( outputRenderTarget, activeCubeFace, activeMipmapLevel );
+ 		this.setMRT( outputMRT );
+ 
+-		if ( item !== null ) item.material.side = materialSide;
++		if ( item !== null ) {
++
++			item.material.side = materialSide;
++			this._currentSourceMaterial = previousSourceMaterial;
++			if ( item.overrideMaterialState !== null ) Object.assign( item.material, this._precompilationState.previousOverrideMaterialState );
++
++		}
+ 
+ 		this._currentRenderContext = previousRenderContext;
+ 
+@@ -67567,6 +67612,18 @@
+ 			this._compilationPromises.push( {
+ 				object,
+ 				material,
++				sourceMaterial: this._currentSourceMaterial,
++				overrideMaterialState: this._currentSourceMaterial !== null ? {
++					colorNode: material.colorNode,
++					depthNode: material.depthNode,
++					positionNode: material.positionNode,
++					alphaMap: material.alphaMap,
++					transparent: material.transparent,
++					displacementMap: material.displacementMap,
++					displacementScale: material.displacementScale,
++					displacementBias: material.displacementBias,
++					_alphaTest: material._alphaTest,
++				} : null,
+ 				side: material.side,
+ 				scene,
+ 				camera,
 diff --git a/src/nodes/core/NodeBuilder.js b/src/nodes/core/NodeBuilder.js
+--- a/src/nodes/core/NodeBuilder.js
++++ b/src/nodes/core/NodeBuilder.js
 @@ -734,7 +734,7 @@
  
  		let bindGroup = new BindGroup( groupName, bindings );
@@ -81,7 +282,9 @@ diff --git a/src/nodes/core/NodeBuilder.js b/src/nodes/core/NodeBuilder.js
  			bindGroup = this.renderer._bindings.getSharedBindGroup( bindGroup );
  
 diff --git a/src/renderers/common/Textures.js b/src/renderers/common/Textures.js
-@@ -703,9 +703,13 @@
+--- a/src/renderers/common/Textures.js
++++ b/src/renderers/common/Textures.js
+@@ -703,8 +703,12 @@
  
  			texture.removeEventListener( 'dispose', textureData.onDispose );
  
@@ -91,12 +294,11 @@ diff --git a/src/renderers/common/Textures.js b/src/renderers/common/Textures.js
 +
 +				this._tracked.delete( textureData.ref );
 +				this._registry.unregister( textureData.ref );
- 
-+			}
 +
++			}
+ 
  			// if a texture is not ready for use, it falls back to a default texture so it's possible
  			// to use it for rendering. If a texture in this state is disposed, it's important to
- 			// not destroy/delete the underlying GPU texture object since it is cached and shared with
 diff --git a/examples/jsm/pipelines/MeshletDrawingPipeline.js b/examples/jsm/pipelines/MeshletDrawingPipeline.js
 --- a/examples/jsm/pipelines/MeshletDrawingPipeline.js
 +++ b/examples/jsm/pipelines/MeshletDrawingPipeline.js
@@ -111,3 +313,107 @@ diff --git a/examples/jsm/pipelines/MeshletDrawingPipeline.js b/examples/jsm/pip
  
  	if ( object.morphTargetInfluences !== undefined && object.morphTargetInfluences.length > 0 ) return false;
  	if ( object.onBeforeRender !== Mesh.prototype.onBeforeRender || object.onAfterRender !== Mesh.prototype.onAfterRender ) return false;
+diff --git a/src/renderers/common/Renderer.js b/src/renderers/common/Renderer.js
+--- a/src/renderers/common/Renderer.js
++++ b/src/renderers/common/Renderer.js
+@@ -1310,6 +1310,28 @@
+ 			precompilationState.materialSide = item.material.side;
+ 			item.material.side = item.side;
+ 
++			// Override passes build source-specific alpha/position nodes and cache keys.
++			// Preserve that source across async work and restore it before each yield.
++			precompilationState.previousSourceMaterial = this._currentSourceMaterial;
++			this._currentSourceMaterial = item.sourceMaterial;
++
++			if ( item.overrideMaterialState !== null ) {
++
++				precompilationState.previousOverrideMaterialState = {
++					colorNode: item.material.colorNode,
++					depthNode: item.material.depthNode,
++					positionNode: item.material.positionNode,
++					alphaMap: item.material.alphaMap,
++					transparent: item.material.transparent,
++					displacementMap: item.material.displacementMap,
++					displacementScale: item.material.displacementScale,
++					displacementBias: item.material.displacementBias,
++					_alphaTest: item.material._alphaTest,
++				};
++				Object.assign( item.material, item.overrideMaterialState );
++
++			}
++
+ 		}
+ 
+ 		this._callDepth ++;
+@@ -1331,12 +1353,18 @@
+ 	 */
+ 	_finishPreCompile() {
+ 
+-		const { useFrameBufferTarget, outputRenderTarget, activeCubeFace, activeMipmapLevel, outputMRT, previousRenderContext, item, materialSide } = this._precompilationState;
++		const { useFrameBufferTarget, outputRenderTarget, activeCubeFace, activeMipmapLevel, outputMRT, previousRenderContext, item, materialSide, previousSourceMaterial } = this._precompilationState;
+ 
+ 		if ( useFrameBufferTarget === true ) this.setRenderTarget( outputRenderTarget, activeCubeFace, activeMipmapLevel );
+ 		this.setMRT( outputMRT );
+ 
+-		if ( item !== null ) item.material.side = materialSide;
++		if ( item !== null ) {
++
++			item.material.side = materialSide;
++			this._currentSourceMaterial = previousSourceMaterial;
++			if ( item.overrideMaterialState !== null ) Object.assign( item.material, this._precompilationState.previousOverrideMaterialState );
++
++		}
+ 
+ 		this._currentRenderContext = previousRenderContext;
+ 
+@@ -4133,6 +4161,18 @@
+ 			this._compilationPromises.push( {
+ 				object,
+ 				material,
++				sourceMaterial: this._currentSourceMaterial,
++				overrideMaterialState: this._currentSourceMaterial !== null ? {
++					colorNode: material.colorNode,
++					depthNode: material.depthNode,
++					positionNode: material.positionNode,
++					alphaMap: material.alphaMap,
++					transparent: material.transparent,
++					displacementMap: material.displacementMap,
++					displacementScale: material.displacementScale,
++					displacementBias: material.displacementBias,
++					_alphaTest: material._alphaTest,
++				} : null,
+ 				side: material.side,
+ 				scene,
+ 				camera,
+diff --git a/src/renderers/common/nodes/NodeManager.js b/src/renderers/common/nodes/NodeManager.js
+--- a/src/renderers/common/nodes/NodeManager.js
++++ b/src/renderers/common/nodes/NodeManager.js
+@@ -541,7 +541,7 @@
+ 	 */
+ 	_createNodeBuilderState( nodeBuilder ) {
+ 
+-		return new NodeBuilderState(
++		const state = new NodeBuilderState(
+ 			nodeBuilder.vertexShader,
+ 			nodeBuilder.fragmentShader,
+ 			nodeBuilder.computeShader,
+@@ -555,6 +555,19 @@
+ 			nodeBuilder.transforms
+ 		);
+ 
++
++		// Shader callbacks can retain this builder. Runtime bindings and update nodes
++		// now belong to state; analysis/generation scratch must not live with them.
++		nodeBuilder.cache.nodesData = new WeakMap();
++		nodeBuilder.globalCache.nodesData = new WeakMap();
++		nodeBuilder.flowsData = new WeakMap();
++		nodeBuilder.nodes.clear();
++		nodeBuilder.sequentialNodes.clear();
++		nodeBuilder.hashNodes = {};
++		nodeBuilder.flowNodes = { vertex: [], fragment: [], compute: [] };
++
++		return state;
++
+ 	}
+ 
+ 	/**

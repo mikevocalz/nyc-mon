@@ -8,7 +8,7 @@
 //   /tiles/...      the pinned tiles (tooling/city/.cache/valdrada, fetched by tooling/city/valdrada/fetch.mjs)
 //   /textures/...   the PBR sets the facade kit loads (tooling/city/.cache/valdrada-textures, fetched by fetch-textures.mjs)
 //   /node/three/... three 0.185.1, the version Valdrada pins (client/package.json), so the bake's geometry is its own
-//   /node/earcut/... earcut 3.0.2
+//   /node/earcut/... earcut 3.2.3, from the pinned source's client lockfile
 //   /harness.html, /harness.js  the page (harness.js beside this file)
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';

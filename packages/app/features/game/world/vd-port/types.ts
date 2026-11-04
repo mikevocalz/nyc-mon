@@ -1,3 +1,4 @@
+import type { InitialAssetProgress } from '../../scene-build-progress.ts';
 // The contract every vd-port sub-builder (./blocks, ./storefronts, ./furniture) builds against.
 //
 // The vd port puts Valdrada's own kits and data (github.com/mkturkcan/valdrada @ 2724c79, MIT) on the bundled tile:
@@ -6,7 +7,7 @@
 import type { Three } from '@acme/ui/three';
 import type { Node } from 'three/webgpu';
 import type { CellPackage } from '../cells/cell-rules.ts';
-import type { ExternalBudget } from '../cells/cell-stream.ts';
+import type { Vec3, ExternalBudget } from '../cells/cell-stream.ts';
 import type { WorldPreset } from '../../perf/tier-presets.ts';
 
 type Group = InstanceType<Three['Group']>;
@@ -38,6 +39,15 @@ export interface VdStreamLayer {
 }
 
 export interface VdPortCtx {
+  onAssetProgress?(event:InitialAssetProgress):void;
+  /** Mapped walking extent; chase collision retains a further40m of actual geometry. */
+  collisionExtent?: number;
+  /** Capabilities of this scene renderer's initialized GPUDevice, never adapter-only support. */
+  hasTextureFeature?(name: string): boolean;
+  /** Compiler is installed by the scene after camera/post setup; authentic templates only. */
+  prepareTemplates?(templates: readonly Mesh[], signal: AbortSignal): Promise<void>;
+  wake?(): void;
+  log?(event: string, data: Record<string, unknown>): void;
   THREE: Three;
   /** Add every mesh here (it is `city:vd-port` under the world group). */
   group: Group;
@@ -100,8 +110,13 @@ export type VdLayerBudget = ExternalBudget;
 
 /** What a sub-builder hands back: per-frame work, disposal and counts for the budget tests. */
 export interface VdPortPart {
+  /** Explicit START-set prerequisites only; late resource ownership remains with this part until disposal. */
+  ready?: Promise<void>;
+  prime?(camera: Vec3, k: number, startRadius: number): Promise<void>;
+  demand?(camera: Vec3, k: number): boolean;
   /** Called each frame with the scene time in seconds (marquee chasers, LED sweeps). Optional. */
-  update?(timeS: number): void;
+  animated?: boolean;
+  update?(timeS: number,reducedMotion?: boolean): void;
   dispose(): void;
   stats: { meshes: number; triangles: number; structures: number };
 }

@@ -1,0 +1,37 @@
+{
+  "repo": "https://huggingface.co/datasets/mehmetkeremturkcan/valdrada",
+  "revision": "09b583662e760b5976d636d341d0e5f81a7c7fcf",
+  "tag": "v0.4.0",
+  "sourceCommit": "2724c7938f20e068748ad1fd66e907d2bc662e3e",
+  "license": "CC0 1.0; source tools/ar35/veg/fetch_vg37.sh and build_vg37.py",
+  "files": {
+    "Content/textures/veg/vg37_hedge_col.webp": {
+      "sha256": "07cda918774d908bba0d5979e864ff5a3f49c2c764252ff61bb2cb619cac302b",
+      "bytes": 737056
+    },
+    "Content/textures/veg/vg37_hedge_nrm.webp": {
+      "sha256": "38bd86523f90d3d10d3bdb3d97eafb0d8902d310bb08f4e67de7de1427cb5589",
+      "bytes": 876156
+    },
+    "Content/textures/veg/vg37_hull_col.jpg": {
+      "sha256": "b0fb5dfc9f999a525341fb6e66e50055a98d4e6e5b38404e498a5b0e6b35e6aa",
+      "bytes": 269539
+    },
+    "Content/textures/veg/vg37_hull_nrm.jpg": {
+      "sha256": "7f6bfc4f8c2e75a62d7e6fe3071772a67fd9cd3b1c24a83eb3b27d3c6c3eb3fe",
+      "bytes": 300465
+    },
+    "Content/textures/veg/vg37_leaf_col.webp": {
+      "sha256": "c7045d5d0836df0f5b4fdb8fefa355a491fae57ed33b599ba6d66b083f38f6f5",
+      "bytes": 517676
+    },
+    "Content/textures/veg/vg37_leaf_nrm.webp": {
+      "sha256": "8bd5001df4ff1ceb40f34dc17ce4cbe9122af3484ccfa561f9aa7bfca53d5f09",
+      "bytes": 514514
+    },
+    "Content/textures/veg/vg37_meta.json": {
+      "sha256": "4cc5c2d2f905d4a6feb67cc6faf7d26814e25519515b9cd4c32ff6876980b315",
+      "bytes": 2221
+    }
+  }
+}

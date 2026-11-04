@@ -50,6 +50,51 @@ function externalFixture(material = new THREE.MeshStandardNodeMaterial()) {
   return { root, template, material, spec };
 }
 
+test('interleaved cohorts reserve all sibling draws across cooperative frames', () => {
+  const f = externalFixture(), a = {}, b = {};
+  const attributes = { position: { array: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]), itemSize: 3, normalized: false } };
+  const bounds = Float64Array.from([0, 0, 0, 1, 1, 1]);
+  const packages = [[1, a], [2, b], [3, a], [4, b]].map(([num, group]) => trianglePackage({ num: num as number, group: group as object, attributes, bounds }));
+  const stream = createCellStream(T, [], { preset: preset({ stream: { msPerFrame: 1e9, uploadBytesPerFrame: 1 } }),
+    external: [{ template: f.template, spec: f.spec, packages, budget: { geometryBytes: 1000, cellDraws: 2, triangles: 100 } }] });
+  for (let i = 0; i < 4; i++) stream.update({ x: 0, y: 2, z: 0 }, K, i / 60);
+  assert.deepEqual(cells(f.root).map(m => m.userData.cell), [1, 3], 'a second cohort cannot consume the first cohort remaining draw');
+  assert.equal(stream.stats.own.cells, 2);
+  stream.dispose();
+});
+
+test('shared demand bounds do not enlarge geometry culling bounds, and upload retains the resource lease', () => {
+  const f = externalFixture();
+  let cpuReleases = 0, lease = true;
+  const pkg = trianglePackage({ num: 1, bounds: Float64Array.from([500, 0, 0, 501, 1, 1]),
+    demandBounds: Float64Array.from([0, 0, 0, 501, 1, 1]),
+    attributes: { position: { array: new Float32Array([500, 0, 0, 501, 0, 0, 500, 1, 0]), itemSize: 3, normalized: false } },
+    release: () => { cpuReleases++; }, releaseResources: () => { lease = false; },
+  });
+  const stream = createCellStream(T, [], { preset: preset({ evictAfterS: 0 }), external: [{ template: f.template, spec: f.spec, packages: [pkg] }] });
+  stream.update({ x: 0, y: 2, z: 0 }, K, 0);
+  assert.equal(cells(f.root).length, 1, 'cohort demand admits the distant sibling');
+  assert.equal(cells(f.root)[0]!.geometry.boundingBox!.min.x, 500, 'culling keeps the original family bounds');
+  assert.equal(cpuReleases, 1); assert.equal(lease, true, 'CPU upload cleanup cannot evict live textures');
+  stream.update({ x: 5000, y: 2, z: 0 }, K, 1);
+  stream.update({ x: 5000, y: 2, z: 0 }, K, 2);
+  assert.equal(cells(f.root).length, 0); assert.equal(lease, false);
+  stream.dispose();
+});
+
+test('a cohort requests every sibling even when a sibling geometry bound lies outside reach', () => {
+  const f = externalFixture(), group = {};
+  const attributes = { position: { array: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]), itemSize: 3, normalized: false } };
+  const a = trianglePackage({ num: 1, group, attributes, bounds: Float64Array.from([0, 0, 0, 1, 1, 1]) });
+  const b = trianglePackage({ num: 2, group, attributes, bounds: Float64Array.from([500, 0, 0, 501, 1, 1]) });
+  const stream = createCellStream(T, [], { preset: preset({ stream: { msPerFrame: 1e9, uploadBytesPerFrame: 1 } }),
+    external: [{ template: f.template, spec: f.spec, packages: [a, b], budget: { geometryBytes: 1000, cellDraws: 2, triangles: 100 } }] });
+  for (let i = 0; i < 4; i++) stream.update({ x: 0, y: 2, z: 0 }, K, i / 60);
+  assert.deepEqual(cells(f.root).map(m => m.userData.cell), [1, 2]);
+  assert.equal(stream.stats.pending, 0, 'reservations never wait indefinitely for an unrequested sibling');
+  stream.dispose();
+});
+
 test('packages the layer, drops the source geometry and keeps a one-triangle template with the same layout', () => {
   const { group, mesh, source } = detailLayer(4);
   let disposed = 0;
@@ -411,4 +456,56 @@ test('camera-away cancellation releases prepared work removed from the request q
   assert.equal(releases, 1, 'all slots, including queue-removed work, cancel when no longer wanted');
   stream.dispose();
   assert.equal(releases, 1, 'cancelled work is not released twice');
+});
+
+test('close START reserves fourteen authenticated future source draws before legacy can fill all twenty-six',()=>{
+ const f=externalFixture(),group={},attributes={position:{array:new Float32Array([0,0,0,1,0,0,0,1,0]),itemSize:3,normalized:false}};
+ const totals={cells:15,bytes:15*54,triangles:15,vertices:45};
+ const legacy=Array.from({length:26},(_,i)=>trianglePackage({num:i+1,attributes,bounds:Float64Array.from([i,0,0,i+1,1,1]),...(i===0?{group,groupBudget:totals}:{})}));
+ const budget={geometryBytes:100000,cellDraws:26,triangles:100};
+ const stream=createCellStream(T,[],{preset:preset(),external:[{template:f.template,spec:f.spec,packages:legacy,budget}]});
+ stream.prime({x:0,y:2,z:0},K,100);
+ assert.equal(cells(f.root).length,12,'legacy cannot steal the fourteen declared close-source draws');
+ const source=f.template.clone();source.name='vd:source';f.root.add(source);
+ const packages=Array.from({length:14},(_,i)=>trianglePackage({num:100+i,group,groupBudget:totals,attributes,bounds:Float64Array.from([0,0,0,1,1,1])}));
+ stream.addExternal({template:source,spec:f.spec,packages,budget});stream.prime({x:0,y:2,z:0},K,100);
+ assert.equal(cells(f.root).filter(mesh=>mesh.name==='vd:source').length,14);
+ assert.equal(stream.stats.own.cells,26);assert.ok(stream.stats.own.bytes<=budget.geometryBytes);assert.ok(stream.stats.own.triangles<=budget.triangles);
+ stream.dispose();
+});
+
+test('late authentic registration repicks and wakes while the camera remains still inside the usual pick interval',()=>{
+ const f=externalFixture();let wakes=0;
+ const stream=createCellStream(T,[],{preset:preset(),wake:()=>{wakes++;}});
+ stream.update({x:0,y:2,z:0},K,1);
+ const pkg=trianglePackage({num:1,attributes:{position:{array:new Float32Array([0,0,0,1,0,0,0,1,0]),itemSize:3,normalized:false}},bounds:Float64Array.from([0,0,0,1,1,1])});
+ stream.addExternal({template:f.template,spec:f.spec,packages:[pkg]});assert.equal(wakes,1);
+ stream.update({x:0,y:2,z:0},K,1.001);assert.equal(cells(f.root).length,1,'new layer cannot park until an unrelated camera gesture');
+ stream.dispose();
+});
+
+test('raised authentic budget keeps all legacy-only draws under their original shared subquota',()=>{
+ const f=externalFixture(),attributes={position:{array:new Float32Array([0,0,0,1,0,0,0,1,0]),itemSize:3,normalized:false}};
+ const quota={geometryBytes:12*54,cellDraws:12,triangles:12};
+ const budget={geometryBytes:128*54,cellDraws:128,triangles:128};
+ const legacy=Array.from({length:128},(_,i)=>trianglePackage({num:i+1,subBudget:quota,attributes,bounds:Float64Array.from([0,0,0,1,1,1])}));
+ const stream=createCellStream(T,[],{preset:preset(),external:[{template:f.template,spec:f.spec,packages:legacy,budget}]});
+ stream.prime({x:0,y:2,z:0},K,100);assert.equal(stream.stats.cells,12);
+ const source=f.template.clone();source.name='vd:source';f.root.add(source);
+ const group={},totals={cells:85,bytes:85*54,triangles:85,vertices:255};
+ const authored=Array.from({length:85},(_,i)=>trianglePackage({num:1000+i,group,groupBudget:totals,attributes,bounds:Float64Array.from([0,0,0,1,1,1])}));
+ stream.addExternal({template:source,spec:f.spec,packages:authored,budget});stream.prime({x:0,y:2,z:0},K,100);
+ assert.equal(cells(f.root).filter(mesh=>mesh.name==='vd:source').length,85,'new source group needs no legacy sibling to reserve capacity');
+ assert.equal(stream.stats.cells,97);assert.ok(stream.stats.own.bytes<=budget.geometryBytes);stream.dispose();
+});
+
+test('removed admission releases unbuilt page leases and fades resident groups without the ordinary eviction delay',()=>{
+ const f=externalFixture();let suppressed=false,releases=0;
+ const group={},attributes={position:{array:new Float32Array([0,0,0,1,0,0,0,1,0]),itemSize:3,normalized:false}};
+ const pkg=trianglePackage({num:1,group,attributes,bounds:Float64Array.from([0,0,0,1,1,1]),suppressed:()=>suppressed,releaseResources(){releases++;}});
+ const stream=createCellStream(T,[],{preset:preset({evictAfterS:100,fadeS:.2}),external:[{template:f.template,spec:{...f.spec,fade:true},packages:[pkg]}]});
+ stream.prime({x:0,y:2,z:0},K,100);assert.equal(stream.stats.cells,1);
+ suppressed=true;
+ for(const time of [1,1.1,1.2,1.3,1.4])stream.update({x:0,y:2,z:0},K,time);
+ assert.equal(stream.stats.cells,0);assert.ok(releases>0,'real page owner released during existing fade, not after 100 seconds');stream.dispose();
 });

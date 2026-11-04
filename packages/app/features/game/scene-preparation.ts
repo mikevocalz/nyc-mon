@@ -54,3 +54,38 @@ export async function runPreparation<T>(
     steps.return(undefined as never);
   }
 }
+
+/** Observe immediately when a builder publishes prerequisite work, even while later CPU phases still yield. */
+export function aggregatePreparationAssets(promises: readonly (Promise<void> | undefined)[]): Promise<void> | undefined {
+  const pending = promises.filter((p): p is Promise<void> => p !== undefined);
+  if (!pending.length) return undefined;
+  const ready = Promise.all(pending).then(() => undefined);
+  void ready.catch(() => {}); // The async preparation owner still receives the original rejection.
+  return ready;
+}
+
+/** The completed scene owns all partial/late resources while its explicit START assets are pending. */
+export async function awaitPreparationAssets<T extends { ready?: Promise<void>; finishAssets?(): void; dispose?(): void | Promise<void> }>(
+  prepared: T, signal?: AbortSignal,
+): Promise<T> {
+  const abortError = () => Object.assign(new Error('Scene asset preparation aborted'), { name: 'AbortError' });
+  try {
+    if (signal?.aborted) throw abortError();
+    if (prepared.ready) await new Promise<void>((resolve, reject) => {
+      const abort = () => { signal?.removeEventListener('abort', abort); reject(abortError()); };
+      signal?.addEventListener('abort', abort, { once: true });
+      // Always observe the source promise: a late rejection after cancellation must never become unhandled.
+      prepared.ready!.then(
+        () => { signal?.removeEventListener('abort', abort); resolve(); },
+        error => { signal?.removeEventListener('abort', abort); reject(error); },
+      );
+    });
+    if (signal?.aborted) throw abortError();
+    prepared.finishAssets?.();
+    if (signal?.aborted) throw abortError();
+    return prepared;
+  } catch (error) {
+    try { await prepared.dispose?.(); } catch (cleanupError) { console.warn('[scene-assets] cleanup failed', cleanupError); }
+    throw error;
+  }
+}

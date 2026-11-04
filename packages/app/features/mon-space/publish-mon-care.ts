@@ -14,6 +14,7 @@ import { clearKeychainSnapshot, writeKeychainSnapshot } from './keychain-widget'
  * reconcile cancels and schedules only the difference.
  */
 export interface MonCareSurfacesInput {
+  readonly watch?: import('./keychain-snapshot.ts').KeychainSnapshot['watch'];
   readonly monInstanceId: string;
   readonly monName: string;
   readonly view: MonCareViewLike;

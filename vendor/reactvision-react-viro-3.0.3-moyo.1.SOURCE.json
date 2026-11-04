@@ -1,0 +1,42 @@
+{
+  "upstream": "https://github.com/mikevocalz/viro",
+  "commit": "98babbc1dc8b4e1357a6ab9283691025b2a3413c",
+  "version": "3.0.3-moyo.1",
+  "license": "MIT",
+  "importDate": "2026-11-02",
+  "source": "Owner-authorized local checkout at /Users/mikevocalz/viro; npm pack --ignore-scripts; committed dist and native artifacts",
+  "copiedSubpaths": [
+    "package.json",
+    "index.d.ts",
+    "index.js",
+    "index.ts",
+    "components",
+    "dist",
+    "plugins",
+    "patches",
+    "shims",
+    "scripts",
+    "examples",
+    "web/renderer",
+    "app.plugin.js",
+    "android/react_viro",
+    "android/viro_renderer",
+    "android/gvr_common",
+    "android/arcore_client",
+    "ios/dist",
+    "ios/ViroReact",
+    "ios/*.h",
+    "ios/*.m",
+    "ios/*.mm",
+    "ios/ViroReact.podspec",
+    "ios/ViroReactUI.podspec",
+    "ios/ViroReactExternalVideo.podspec",
+    "bin",
+    "LICENSE"
+  ],
+  "archiveSha256": "78ade599f85fee9b2301ed9531f7fd35d5418574e2817b852ebc850852e0c4eb",
+  "nativeBinaries": {
+    "ios/dist/lib/libViroReact.a": "6c059ac6bc11e58908d9d3586c065a429084cf458f409dc9f8ab5a575d9f403a",
+    "ios/dist/ViroRenderer/ViroKit.framework/ViroKit": "dfd54f391a941c584e1c23e4c40af4a05ebb46ef43d2ea70c8a1db594294169b"
+  }
+}

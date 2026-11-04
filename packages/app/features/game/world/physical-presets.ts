@@ -2,6 +2,7 @@
 //
 // The four time-of-day presets as typed rows: colours from @acme/theme
 // physicalCityLight, numbers from physical-look.ts. Pure, no three import.
+import { resolveSourceLook, type SourceLook } from './source-look.ts';
 import { physicalCityLight } from '@acme/theme';
 import {
   PHYSICAL_GRADE,
@@ -27,6 +28,7 @@ export interface PhysicalPreset extends PhysicalLightNumbers {
   /** Unit vector toward the sun; Slop normalises its table rows the same way. */
   sunDirection: readonly [number, number, number];
   grade: PhysicalGradeNumbers;
+  sourceLook: SourceLook;
 }
 
 function normalise(v: readonly [number, number, number]): readonly [number, number, number] {
@@ -36,11 +38,19 @@ function normalise(v: readonly [number, number, number]): readonly [number, numb
 
 function resolve(id: PhysicalPresetId): PhysicalPreset {
   const light = PHYSICAL_LIGHT[id];
+  const sourceLook = resolveSourceLook(id);
   return {
     ...light,
     id,
     colors: { ...physicalCityLight[id] },
-    sunDirection: normalise(light.sunDir),
+    sunDir: sourceLook.sunDirection,
+    nightFactor: sourceLook.night,
+    sunIntensity: sourceLook.sunIntensity,
+    hemiIntensity: sourceLook.hemiIntensity,
+    envIntensity: sourceLook.envIntensity,
+    fogDensity: sourceLook.fogDensity,
+    sunDirection: normalise(sourceLook.sunDirection),
+    sourceLook,
     grade: PHYSICAL_GRADE[id],
   };
 }

@@ -1,0 +1,15 @@
+{
+  "repo": "https://huggingface.co/datasets/mehmetkeremturkcan/valdrada",
+  "revision": "09b583662e760b5976d636d341d0e5f81a7c7fcf",
+  "sourceCommit": "2724c7938f20e068748ad1fd66e907d2bc662e3e",
+  "files": {
+    "Content/textures/cityao.bin": {
+      "sha256": "59c36c873e554bba79065d3029f033ddbfe138c7f4566e5e8d280bb9f50aa23f",
+      "bytes": 24780800
+    },
+    "Content/textures/cityao.json": {
+      "sha256": "86e917e5f409820f009728c4bc72ea670d2ac00bf788f233c328d81873d5d189",
+      "bytes": 109
+    }
+  }
+}

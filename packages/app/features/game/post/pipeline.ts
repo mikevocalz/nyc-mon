@@ -65,6 +65,10 @@ import { ssao } from 'three/examples/jsm/tsl/display/SSAONode.js';
 import { fxaa } from 'three/examples/jsm/tsl/display/FXAANode.js';
 import type { ssr } from 'three/examples/jsm/tsl/display/SSRNode.js';
 import { loadFsr1Node, loadSsrNode, loadTaauNode } from '../physical-graph.ts';
+import { createSourceDisplayGrade } from './source-display-grade.ts';
+import { createSourceExposure } from './source-exposure.ts';
+import { createSourceHaze } from './source-haze.ts';
+import type { SourceLook } from '../world/source-look.ts';
 import { parseSkyRigFlag } from '../world/sky-rig.ts';
 import {
   PHYSICAL_POST,
@@ -236,6 +240,8 @@ export interface AppliedPostEffects {
 }
 
 export interface CityPostRequest {
+  wake?: () => void;
+  afterRender?: () => void;
   /** The canvas renderer — the mount replaces its render() entry point. */
   renderer: RendererT;
   /** The scene the pass node renders each frame. */
@@ -250,6 +256,7 @@ export interface CityPostRequest {
 
 /** Which Slop stages to wire; a Phase 0 probe sets one. */
 export interface PhysicalPostRequest {
+  sourceLook?: SourceLook;
   /** Scene pass writes output, normalView and metalRough. */
   mrt: boolean;
   /** SSR from the MRT; ignored without `mrt` or without tier SSR settings. */
@@ -280,6 +287,9 @@ export interface PhysicalPostHandle {
   upscaleNode: Fsr1T | TaauT | null;
   /** js/post-processing.js applyPreset: exposure, balance, contrast, saturation, bloom strength and threshold. */
   applyLook(look: PhysicalGradeNumbers): void;
+  applySourceLook(look: SourceLook): void;
+  updateSourceFrame(time: number, reducedMotion: boolean): void;
+  updateSourceCamera(frame: {origin: readonly [number,number,number];sourceYOffset:number}): void;
 }
 
 export interface CityPostPipeline {
@@ -301,7 +311,7 @@ export interface CityPostPipeline {
    */
   withDirectRender<R>(fn: () => R): R;
   /** Restores renderer.render and tone mapping, then frees the nodes and the pipeline. */
-  dispose(): void;
+  dispose(): void | Promise<void>;
 }
 
 /**
@@ -415,7 +425,7 @@ export function mountCityPostPipeline(THREE: Three, request: CityPostRequest): C
  * those nested calls to the direct path. `direct(fn)` sets the same flag
  * around a caller's own renders. Returns the undo and that wrapper.
  */
-function delegateRender(renderer: RendererT, pipeline: PipelineT): { restore(): void; direct<R>(fn: () => R): R } {
+function delegateRender(renderer: RendererT, pipeline: PipelineT, afterRender?: () => void): { restore(): void; direct<R>(fn: () => R): R } {
   const directRender = renderer.render;
   const hadOwnRender = Object.hasOwn(renderer, 'render');
   let inPipeline = false;
@@ -424,6 +434,7 @@ function delegateRender(renderer: RendererT, pipeline: PipelineT): { restore(): 
     inPipeline = true;
     try {
       pipeline.render();
+      afterRender?.();
     } finally {
       inPipeline = false;
     }
@@ -561,27 +572,49 @@ function mountPhysical(
     reflections = ssrNode.rgb.mul(reflectionMask);
   }
 
+  let sourceLook = physical.sourceLook;
+  let sourceTime = 0, sourceReducedMotion = false;
+  scenePass.getTextureNode('depth');
+  const sourceExposure = sourceLook ? createSourceExposure(THREE, renderer, {
+    color: scenePass.renderTarget.texture, depth: scenePass.renderTarget.depthTexture!,
+  }, request.wake ?? (() => {})) : null;
   const exposure = T.uniform(1);
   const contrast = T.uniform(1);
   const saturation = T.uniform(1);
   const balance = T.uniform(new THREE.Vector3(1, 1, 1));
-  const lit = reflections ? sceneColor.rgb.add(reflections) : sceneColor.rgb;
+  const rawLit = reflections ? sceneColor.rgb.add(reflections) : sceneColor.rgb;
+  const sourceHaze = sourceLook ? createSourceHaze(THREE,T.vec4(rawLit,1),scenePass.getTextureNode('depth').r,camera,sourceLook) : null;
+  const lit = sourceHaze ? sourceHaze.output.rgb : rawLit;
+  const sourceBloomPeak = T.uniform(sourceLook?.bloom.maxLuminance ?? P.bloomPeak);
   // Exposure and white balance before bloom, so the threshold follows the exposed image.
-  const exposed = physical.grade ? T.max(lit, T.vec3(0)).mul(exposure).mul(balance) : lit;
+  const exposed = physical.grade && !sourceLook ? T.max(lit, T.vec3(0)).mul(exposure).mul(balance) : lit;
 
   let bloomNode: BloomT | null = null;
   if (physical.bloom) {
     // Limit only bloom's peak radiance, scaling RGB together to keep neon and lamp hues.
     const peak = T.max(T.max(exposed.r, exposed.g), exposed.b);
-    const bloomInput = T.vec4(exposed.mul(T.float(P.bloomPeak).div(T.max(peak, P.bloomPeak))), 1);
+    const bloomInput = T.vec4(sourceLook ? exposed : exposed.mul(T.float(P.bloomPeak).div(T.max(peak, P.bloomPeak))), 1);
     bloomNode = bloom(bloomInput, settings.look.bloom, P.bloomRadius, settings.look.threshold);
+    if (sourceLook) {
+      const sourceHighPass = bloomNode.highPassFn as (params: Parameters<BloomT['highPassFn']>[0]) => Node<'vec4'>;
+      bloomNode.highPassFn = params => {
+        const bright = sourceHighPass(params);
+        return T.vec4(T.min(bright.rgb,sourceBloomPeak),bright.a);
+      };
+    }
     bloomNode.smoothWidth.value = P.bloomSmoothWidth;
     bloomNode.setResolutionScale(settings.bloomResolutionScale);
   }
   const bloomed = bloomNode ? exposed.add(bloomNode.rgb) : exposed;
 
+  const sourceHdr = T.vec4(sourceExposure ? bloomed.mul(sourceExposure.exposure) : bloomed, 1);
+  const sourceDisplay = sourceLook && physical.grade ? createSourceDisplayGrade(THREE, sourceHdr) : null;
   let outputNode: Node;
-  if (physical.grade) {
+  if (sourceDisplay) {
+    outputNode = sourceDisplay.outputNode;
+  } else if (sourceLook) {
+    outputNode = sourceHdr;
+  } else if (physical.grade) {
     const lumaWeights = T.vec3(...P.luma);
     outputNode = T.Fn(() => {
       const color = T.vec3(bloomed).toVar();
@@ -611,13 +644,13 @@ function mountPhysical(
 
   const priorToneMapping = renderer.toneMapping;
   const priorExposure = renderer.toneMappingExposure;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMapping = sourceLook ? THREE.AgXToneMapping : THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1;
 
   const pipeline = new THREE.RenderPipeline(renderer);
-  pipeline.outputColorTransform = true;
+  pipeline.outputColorTransform = sourceDisplay === null;
   pipeline.outputNode = outputNode;
-  const delegate = delegateRender(renderer, pipeline);
+  const delegate = delegateRender(renderer, pipeline, () => { sourceExposure?.afterRender(); request.afterRender?.(); });
 
   const handle: PhysicalPostHandle = {
     applied: {
@@ -631,7 +664,21 @@ function mountPhysical(
     ssrNode,
     bloomNode,
     upscaleNode,
+    applySourceLook(look) {
+      sourceLook = look; sourceExposure?.update(look); sourceHaze?.updateLook(look); sourceDisplay?.update(look, sourceTime, sourceReducedMotion);
+      sourceBloomPeak.value = look.bloom.maxLuminance;
+      if (bloomNode) {
+        bloomNode.strength.value = look.bloom.strength; bloomNode.threshold.value = look.bloom.threshold;
+        bloomNode.radius.value = look.bloom.radius; bloomNode.smoothWidth.value = look.bloom.smoothWidth;
+      }
+    },
+    updateSourceCamera(frame) { sourceHaze?.updateCamera(frame); },
+    updateSourceFrame(time, reducedMotion) {
+      sourceTime = time; sourceReducedMotion = reducedMotion;
+      if (sourceLook) sourceDisplay?.update(sourceLook,time,reducedMotion);
+    },
     applyLook(look) {
+      if (sourceLook) return;
       exposure.value = look.exposure;
       contrast.value = look.contrast;
       saturation.value = look.saturation;
@@ -643,6 +690,7 @@ function mountPhysical(
     },
   };
   handle.applyLook(settings.look);
+  if (sourceLook) handle.applySourceLook(sourceLook);
 
   let disposed = false;
   return {
@@ -658,11 +706,13 @@ function mountPhysical(
       delegate.restore();
       renderer.toneMapping = priorToneMapping;
       renderer.toneMappingExposure = priorExposure;
-      ssrNode?.dispose();
-      bloomNode?.dispose();
-      upscaleNode?.dispose();
-      scenePass.dispose();
-      pipeline.dispose();
+      const release = () => {
+        sourceDisplay?.dispose(); sourceHaze?.dispose(); ssrNode?.dispose(); bloomNode?.dispose(); upscaleNode?.dispose();
+        scenePass.dispose(); pipeline.dispose();
+      };
+      const drain = sourceExposure?.dispose();
+      if (drain) return drain.then(release);
+      release();
     },
   };
 }

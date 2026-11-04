@@ -24,7 +24,7 @@ test('flag on: the full feature set, SSR per the phone tier', () => {
   assert.equal(cityPhysicalFeatures()!.ssr, false, 'the phone tier starts with SSR off');
 });
 
-test('flag on: sRGB output, ACES in one pipeline, shadows, null background, the Slop rig', async () => {
+test('flag on: sRGB output, authored AgX in one pipeline, shadows, null background, the source rig', async () => {
   const bakes = recordPmremBakes();
   try {
     const renderer = await stubRenderer();
@@ -35,7 +35,7 @@ test('flag on: sRGB output, ACES in one pipeline, shadows, null background, the 
     const scene = built.scene as InstanceType<typeof THREE.Scene>;
 
     assert.equal(renderer.outputColorSpace, THREE.SRGBColorSpace);
-    assert.equal(renderer.toneMapping, THREE.ACESFilmicToneMapping);
+    assert.equal(renderer.toneMapping, THREE.AgXToneMapping);
     assert.equal(renderer.toneMappingExposure, 1);
     assert.equal(renderer.shadowMap.enabled, true);
     assert.equal(scene.background, null);
@@ -56,7 +56,7 @@ test('flag on: sRGB output, ACES in one pipeline, shadows, null background, the 
     assert.equal(worldLightsLit, 0, 'the world sun and hemi are replaced, not doubled');
     assert.equal(bakes.calls, 1);
     assert.ok(scene.environment);
-    assert.ok((scene as unknown as { fogNode: unknown }).fogNode);
+    assert.equal((scene as unknown as { fogNode: unknown }).fogNode, null, 'source height haze is owned by the post graph');
     assert.equal(scene.environmentIntensity, PHYSICAL_PRESETS.twilight.envIntensity);
     assert.equal(scene.getObjectByName('city:walls-masonry')!.castShadow, true);
     assert.equal(scene.getObjectByName('city:roads')!.castShadow, false);
@@ -78,7 +78,7 @@ test('flag on: sRGB output, ACES in one pipeline, shadows, null background, the 
     built.update!({ delta: 0, time: 0, reducedMotion: false } as never, { ...params, preset: 'midnight' });
     assert.equal(bakes.calls, 2);
     assert.equal(scene.environment, env);
-    assert.ok((sun as InstanceType<typeof SunLight>).color.equals(new THREE.Color(PHYSICAL_PRESETS.midnight.colors.sun)));
+    assert.ok((sun as InstanceType<typeof SunLight>).color.equals(new THREE.Color().setRGB(...PHYSICAL_PRESETS.midnight.sourceLook.sunColor)));
     built.update!({ delta: 0, time: 0, reducedMotion: false } as never, { ...params, preset: 'midnight' });
     assert.equal(bakes.calls, 2, 'same preset, no rebake');
 

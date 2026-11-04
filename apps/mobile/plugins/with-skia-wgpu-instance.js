@@ -37,7 +37,12 @@ function appConfigurationIds(project) {
   const lists = project.pbxXCConfigurationList();
   for (const [key, target] of Object.entries(project.pbxNativeTargetSection())) {
     if (key.endsWith('_comment') || typeof target !== 'object' || target.productType !== APPLICATION) continue;
-    for (const ref of lists[target.buildConfigurationList]?.buildConfigurations ?? []) ids.add(ref.value);
+    for (const ref of lists[target.buildConfigurationList]?.buildConfigurations ?? []) {
+      const settings = project.pbxXCBuildConfigurationSection()[ref.value]?.buildSettings;
+      // A modern SwiftUI Watch app is also product-type.application, but has no Skia.
+      if (String(settings?.SDKROOT ?? '').replace(/"/g, '') === 'watchos') continue;
+      ids.add(ref.value);
+    }
   }
   return ids;
 }

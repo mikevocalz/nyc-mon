@@ -1,0 +1,28 @@
+import { readFile, writeFile, mkdir, readdir } from 'node:fs/promises';
+import { join } from 'node:path';
+import { MeshoptEncoder } from '../../../node_modules/.pnpm/meshoptimizer@1.1.1/node_modules/meshoptimizer/index.js';
+import { identifySurfaceFamily } from './surface-families.mjs';
+import { registryFromCapture } from './surface-capture.mjs';
+import { surfaceBankBindings } from './surface-bank-bindings.mjs';
+import { buildPilotSurfaceParameters } from './surface-parameters.mjs';
+import { writeSurfacePacks } from './write-surfaces.mjs';
+
+const [capturePath='/tmp/nycmon-block-surface-pilot.json',bankPath='/tmp/nycmon-surface-pilot-bank/manifest.json',outDir='/tmp/nycmon-surface-cell-pilot']=process.argv.slice(2);
+const bakeDeps=process.env.VD_BAKE_DEPS??'/tmp/nycmon-vd185-tools';
+const capture=JSON.parse(await readFile(capturePath,'utf8')),bank=JSON.parse(await readFile(bankPath,'utf8'));
+const binding=surfaceBankBindings(capture,bank);
+const identifyFamily=identifySurfaceFamily;
+const blockDir='packages/app/features/game/world/vd-port/blocks';
+const provenanceFiles=(await readdir(blockDir)).filter(name=>name.endsWith('.ts')&&!name.endsWith('.test.ts')&&(name.startsWith('source-')||['glass-material.ts','material-table.ts','surface-parameters.ts','surface-registry.ts','surface-material-bank.ts','surface-layers.ts','surface-part.ts','codec.ts','sign-material.ts','apollo-material.ts','custom-building-material.ts','vegetation-material.ts'].includes(name))).map(name=>({path:`${blockDir}/${name}`,file:`${blockDir}/${name}`}));
+for(const path of ['packages/app/features/game/world/vd-port/furniture/pbr-material.ts','tooling/city/vd-port/surface-layout.mjs','tooling/city/vd-port/surface-codec.mjs','tooling/city/vd-port/write-surfaces.mjs','tooling/city/vd-port/surface-harvest.mjs','tooling/city/vd-port/shadow-provenance.js','tooling/city/vd-port/geometry-provenance.js','tooling/city/vd-port/surface-registry.mjs','tooling/city/vd-port/surface-capture.mjs','tooling/city/vd-port/surface-parameters.mjs','tooling/city/vd-port/surface-frame.mjs','tooling/city/vd-port/surface-families.mjs','tooling/city/vd-port/pack-surface-textures.mjs','tooling/city/vd-port/surface-bank-bindings.mjs','tooling/city/vd-port/build-surface-pilot.mjs'])provenanceFiles.push({path,file:path});
+for(const name of ['three.module.js','three.core.js'])provenanceFiles.push({path:`bake-deps/three0.185.1/build/${name}`,file:join(bakeDeps,'three/build',name)});
+if(bank.requiredFeatures?.includes('texture-compression-astc'))for(const path of ['tooling/city/vd-port/transcode-surface-ktx.mjs','tooling/city/vd-port/build-surface-astc-bank.mjs'])provenanceFiles.push({path,file:path});
+const {registry,structures}=registryFromCapture(capture,{...binding,identifyFamily,provenanceFiles,cell:{cx:-1,cz:1}});
+const before=registry.finalize();
+if(!before.coverage.complete)throw new Error(`Pilot source graph coverage incomplete: ${JSON.stringify(before.coverage.unsupported)}`);
+await MeshoptEncoder.ready;
+const output=await writeSurfacePacks({structures,registry,encoder:MeshoptEncoder,outDir,buildParameters:buildPilotSurfaceParameters});
+await mkdir(outDir,{recursive:true});
+await writeFile(join(outDir,'registry.json'),JSON.stringify(output.registry));
+await writeFile(join(outDir,'manifest.json'),JSON.stringify({cells:output.cells,audit:output.audit}));
+console.log(JSON.stringify({outDir,sha256:output.registry.sha256,materials:output.registry.materialCount,variants:output.registry.variantCount,families:output.registry.families.length,cells:output.cells.length,triangles:output.cells.reduce((sum,cell)=>sum+cell.triangles,0)}));

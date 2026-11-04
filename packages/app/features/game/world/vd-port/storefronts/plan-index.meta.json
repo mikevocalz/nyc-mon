@@ -7,7 +7,7 @@
     "packages/app/features/game/world/vd-port/storefronts/load.ts": "dd8fdcd0411606af0cd3d087cd47729ecd7cec22e03ef4ba34c8a501127d823c",
     "packages/app/features/game/world/vd-port/storefronts/emit.ts": "579302a0f7046ab5a1ce36104814f067e26931f54b22604394e757dc2727b492",
     "packages/app/features/game/world/vd-port/storefronts/chunk-index.ts": "4e3a948567f2a023c0e8e554dcd3720f9d11af77c24dabb5536215b2f709d20e",
-    "packages/app/features/game/world/cells/cell-rules.ts": "033fa2a72409ca1671f85c1c6fc386135b4ca7b1d1d6aff84c670c7000df291a",
+    "packages/app/features/game/world/cells/cell-rules.ts": "07a65c785d56825909c07cd0aa1e9bae321a9e40a0027ed4a85886c516095d78",
     "packages/app/features/game/world/sky-rig.ts": "89c4115a7f9e07aff38107c149e3a09e0d566e9c65097aa7ebe8f18f595c8c96",
     "packages/app/features/game/data/harlem-apollo.json": "3bdd4dd9591add9481f829c0071cc6339155c39ad5a2af6dfdf9ae1c0075477d",
     "packages/app/features/game/city-dataset.ts": "018c93d82c91a11574859f1289565dd1d0c025a1d5f426113aa7e632711e2b68",

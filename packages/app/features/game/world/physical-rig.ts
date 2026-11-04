@@ -22,6 +22,9 @@
 //   per-material path.
 import type { Three } from '@acme/ui/three';
 import type { CubeRenderTarget, Node, RenderTarget, Texture, UniformNode } from 'three/webgpu';
+import { createSourceLightProbe } from './source-light-probe.ts';
+import { createSourceCloudDeck } from './source-cloud-deck.ts';
+import { createSourceSky } from './source-sky.ts';
 import { SkyMesh } from 'three/examples/jsm/objects/SkyMesh.js';
 import { SunLight } from 'three/examples/jsm/lights/SunLight.js';
 import { SunLightNode } from 'three/examples/jsm/lights/SunLightNode.js';
@@ -34,6 +37,7 @@ import {
   type PhysicalFeatures,
   type PhysicalPresetId,
 } from './physical-look.ts';
+import { resolveSourceLook, type SourceLook, type SourceLookWeather } from './source-look.ts';
 import { PHYSICAL_NIGHT_SKY, PHYSICAL_PRESETS } from './physical-presets.ts';
 import { createSoftShadowFilter, SOFT_SHADOW_RADIUS } from './physical/soft-shadow-filter.ts';
 
@@ -83,6 +87,7 @@ export function cityUniforms(THREE: Three): CityUniforms {
 
 export interface PhysicalRigOptions {
   features: PhysicalFeatures;
+  wake?(): void;
   /** Per-cascade shadow tile the tier allows (perf/tier.ts); the device limit can lower it. */
   shadowTile: number;
   /** ClusteredLighting maxLights from the tier. */
@@ -108,6 +113,13 @@ export interface PhysicalRig {
   readonly environment: TextureT | null;
   uniforms: CityUniforms;
   readonly preset: PhysicalPresetId;
+  readonly sourceLook: SourceLook;
+  readonly sourceProbePreparation: {camera: import('three/webgpu').Camera; target: import('three/webgpu').CubeRenderTarget} | null;
+  readonly animated: boolean;
+  setSourceWeather(weather: SourceLookWeather): void;
+  setSourceHazeActive(active: boolean): void;
+  beforeRender(camera: InstanceType<Three['PerspectiveCamera']>, timeS: number, reducedMotion?: boolean, sourceYOffset?:number): void;
+  afterRender(camera: InstanceType<Three['PerspectiveCamera']>, dt: number): void;
   /** Re-light for a preset; rebakes the environment into the same render target. */
   applyPreset(id: PhysicalPresetId, force?: boolean): void;
   /**
@@ -120,8 +132,8 @@ export interface PhysicalRig {
    */
   setShadowInterval(interval: number): void;
   /** Per frame: shadow far plane from camera altitude; the shadow1 light follows the focus. */
-  update(cameraY: number, focusX: number, focusZ: number): void;
-  dispose(): void;
+  update(cameraY: number, focusX: number, focusZ: number, timeS?: number): void;
+  dispose(): void | Promise<void>;
 }
 
 
@@ -147,37 +159,24 @@ export function createPhysicalRig(
   const uniforms = cityUniforms(THREE);
   let presetId: PhysicalPresetId = options.preset ?? DEFAULT_PHYSICAL_PRESET;
   const start = PHYSICAL_PRESETS[presetId];
+  let sourceWeather: SourceLookWeather = {};
+  let sourceProbe: ReturnType<typeof createSourceLightProbe> | null = null;
+  let sourceLook = resolveSourceLook(presetId, sourceWeather);
   const added: Object3DT[] = [];
 
   // ---- Sky, PMREM, aerial fog -------------------------------------------------
   let sky: InstanceType<typeof SkyMesh> | null = null;
-  let uSkyExposure: UniformNode<'float', number> | null = null;
-  let uNightFactor: UniformNode<'float', number> | null = null;
+  let sourceSky: ReturnType<typeof createSourceSky> | null = null;
+  let sourceEnvSky: ReturnType<typeof createSourceSky> | null = null;
+  let sourceClouds:ReturnType<typeof createSourceCloudDeck>|null=null;
   let uFogDensity: UniformNode<'float', number> | null = null;
   let fog: InstanceType<Three['FogExp2']> | null = null;
   if (features.skyPmrem) {
-    sky = new SkyMesh();
-    sky.name = 'city:physical-sky';
-    sky.scale.setScalar(PHYSICAL_RIG.skyScale);
-    sky.cloudScale.value = PHYSICAL_RIG.cloudScale;
-    sky.cloudSpeed.value = PHYSICAL_RIG.cloudSpeed;
-    sky.cloudElevation.value = PHYSICAL_RIG.cloudElevation;
-    const exposure = T.uniform(start.skyExposure);
-    const night = T.uniform(start.nightFactor);
-    const nightSky = T.uniform(new THREE.Color(PHYSICAL_NIGHT_SKY));
-    uSkyExposure = exposure;
-    uNightFactor = night;
-    const rawColor = sky.material.colorNode as Node<'vec4'>;
-    sky.material.colorNode = T.Fn(() => T.vec4(T.mix(rawColor.rgb.mul(exposure), nightSky, night), T.float(1)))();
-    // reversedDepthBuffer: far is z = 0, where SkyMesh writes z = w.
-    if (renderer?.reversedDepthBuffer === true) {
-      const rawVertex = sky.material.vertexNode as Node<'vec4'>;
-      sky.material.vertexNode = T.Fn(() => {
-        const position = rawVertex.toVar();
-        position.z.assign(0);
-        return position;
-      })();
-    }
+    sourceSky = createSourceSky(THREE, false, renderer?.reversedDepthBuffer === true);
+    sourceEnvSky = createSourceSky(THREE, true, renderer?.reversedDepthBuffer === true);
+    sky = sourceSky.sky;
+    sourceSky.apply(sourceLook);sourceEnvSky.apply(sourceLook);
+    sourceClouds=createSourceCloudDeck(THREE);sourceClouds.apply(sourceLook);scene.add(sourceClouds.mesh);added.push(sourceClouds.mesh);
     scene.add(sky);
     added.push(sky);
     fog = new THREE.FogExp2(new THREE.Color(start.colors.fog), start.fogDensity);
@@ -193,13 +192,12 @@ export function createPhysicalRig(
 
   function bakeEnvironment() {
     if (!pmrem || !sky) return;
-    sky.showSunDisc.value = 0;
-    envScene.add(sky);
-    envTarget = pmrem.fromScene(envScene, PHYSICAL_RIG.pmremSigma, PHYSICAL_RIG.pmremNear, PHYSICAL_RIG.pmremFar, {
+    if (!sourceEnvSky) return;
+    envScene.add(sourceEnvSky.sky);
+    envTarget = pmrem.fromScene(envScene, .02, PHYSICAL_RIG.pmremNear, PHYSICAL_RIG.pmremFar, {
       renderTarget: envTarget,
     });
     scene.environment = envTarget.texture;
-    sky.showSunDisc.value = 1;
     scene.add(sky);
   }
 
@@ -293,6 +291,14 @@ export function createPhysicalRig(
     added.push(hemi);
   }
 
+  let bounce: InstanceType<Three['HemisphereLight']> | null = null;
+  if (features.hemisphere) {
+    bounce = new THREE.HemisphereLight();
+    bounce.name = 'city:source-warm-bounce';
+    bounce.position.set(0, PHYSICAL_RIG.hemiHeight, 0);
+    scene.add(bounce); added.push(bounce);
+  }
+
   // ---- Clustered lighting -------------------------------------------------------
   const priorLighting = renderer?.lighting ?? null;
   // Kept so dispose can free the scene's clustered node and its storage buffers.
@@ -327,43 +333,45 @@ export function createPhysicalRig(
     if (!force && id === presetId && envTarget !== null) return;
     presetId = id;
     const p = PHYSICAL_PRESETS[id];
+    sourceLook = resolveSourceLook(id, sourceWeather);
+    sourceProbe?.setLook(sourceLook);
     if (sun) {
-      sun.color.set(p.colors.sun);
-      sun.intensity = p.sunIntensity;
-      placeSun(p.sunDirection);
+      sun.color.setRGB(...sourceLook.sunColor);
+      sun.intensity = sourceLook.sunIntensity;
+      placeSun(sourceLook.sunDirection);
       // The sun moved: the atlas can't wait for the interval tick.
       pokeShadow();
     }
     if (hemi) {
-      hemi.color.set(p.colors.hemiSky);
-      hemi.groundColor.set(p.colors.hemiGround);
-      hemi.intensity = p.hemiIntensity;
+      hemi.color.setRGB(...sourceLook.hemiSky);
+      hemi.groundColor.setRGB(...sourceLook.hemiGround);
+      hemi.intensity = sourceLook.hemiIntensity;
+    }
+    if (bounce) {
+      bounce.color.setRGB(...sourceLook.bounceSky); bounce.groundColor.setRGB(...sourceLook.bounceGround); bounce.intensity = sourceLook.bounceIntensity;
     }
     if (fog) {
-      fog.color.set(p.colors.fog);
-      fog.density = p.fogDensity;
+      fog.color.setRGB(...sourceLook.horizon);
+      fog.density = sourceLook.sceneFogDensity;
     }
-    if (uFogDensity) uFogDensity.value = p.fogDensity;
+    if (uFogDensity) uFogDensity.value = sourceLook.fogDensity;
+    sourceSky?.apply(sourceLook);sourceEnvSky?.apply(sourceLook);sourceClouds?.apply(sourceLook);
     if (sky) {
-      sky.turbidity.value = p.turbidity;
-      sky.rayleigh.value = p.rayleigh;
-      sky.mieCoefficient.value = p.mieCoefficient;
-      sky.mieDirectionalG.value = p.mieDirectionalG;
-      sky.cloudCoverage.value = p.cloudCoverage;
-      sky.cloudDensity.value = p.cloudDensity;
-      sky.sunPosition.value.set(...p.sunDirection);
+      sky.turbidity.value = sourceLook.sky.turbidity;
+      sky.rayleigh.value = sourceLook.sky.rayleigh;
+      sky.mieCoefficient.value = sourceLook.sky.mieCoefficient;
+      sky.mieDirectionalG.value = sourceLook.sky.mieDirectionalG;
+      sky.sunPosition.value.set(...sourceLook.sunDirection);
     }
-    if (uSkyExposure) uSkyExposure.value = p.skyExposure;
-    if (uNightFactor) uNightFactor.value = p.nightFactor;
-    uniforms.uSunColor.value.set(p.colors.sun);
-    uniforms.uSkyTopColor.value.set(p.colors.skyTop);
-    uniforms.uSkyHorizonColor.value.set(p.colors.skyHorizon);
-    uniforms.uSkySunDir.value.set(...p.sunDirection);
+    uniforms.uSunColor.value.setRGB(...sourceLook.sunColor);
+    uniforms.uSkyTopColor.value.setRGB(...sourceLook.skyAmbient);
+    uniforms.uSkyHorizonColor.value.setRGB(...sourceLook.horizon);
+    uniforms.uSkySunDir.value.set(...sourceLook.sunDirection);
     uniforms.uInteriorGlow.value = p.interiorGlow;
     uniforms.uRoadWetness.value = p.roadWetness;
     uniforms.uCanyonBounce.value = p.canyonBounce;
     if (sky) {
-      scene.environmentIntensity = p.envIntensity;
+      scene.environmentIntensity = sourceLook.envIntensity;
       bakeEnvironment();
     }
   }
@@ -377,7 +385,30 @@ export function createPhysicalRig(
     (scene as unknown as { fogNode: unknown }).fogNode = aerialFogNode(baked.texture, uFogDensity);
   }
 
+  sourceProbe = renderer && features.hemisphere ? createSourceLightProbe(THREE, renderer, scene, () => options.wake?.()) : null;
+  sourceProbe?.setLook(sourceLook);
+  let previousWeather: SourceLookWeather | undefined;
+  let previousPreset: PhysicalPresetId | undefined, previousProbe = -1;
+  let hazeActive = false;
+  let skyTime = 0, previousSkyTime: number | undefined, skyPaused = false;
   let disposed = false;
+  let disposal: Promise<void> | undefined;
+  function composeWeather() {
+    const probeOn = sourceProbe?.probeOn ?? 0;
+    if (previousPreset === presetId && previousProbe === probeOn && previousWeather &&
+      previousWeather.rain===sourceWeather.rain && previousWeather.cloud===sourceWeather.cloud && previousWeather.snow===sourceWeather.snow &&
+      previousWeather.flash===sourceWeather.flash && previousWeather.lampBounceK===sourceWeather.lampBounceK && previousWeather.timeSquareDayK===sourceWeather.timeSquareDayK) return;
+    previousPreset=presetId;previousProbe=probeOn;previousWeather={...sourceWeather};
+    sourceLook = resolveSourceLook(presetId, { ...sourceWeather, probeOn: sourceProbe?.probeOn ?? 0 });
+    sourceProbe?.setLook(sourceLook);
+    if (sun) sun.intensity = sourceLook.sunIntensity;
+    if (hemi) hemi.intensity = sourceLook.hemiIntensity;
+    if (bounce) bounce.intensity = sourceLook.bounceIntensity;
+    if (fog) fog.density = sourceLook.sceneFogDensity;
+    if (uFogDensity) uFogDensity.value = sourceLook.fogDensity;
+    if (sky) scene.environmentIntensity = sourceLook.envIntensity;
+    sourceClouds?.apply(sourceLook);
+  }
   return {
     sky,
     sun,
@@ -391,6 +422,25 @@ export function createPhysicalRig(
       return presetId;
     },
     applyPreset,
+    get sourceLook() { return sourceLook; },
+    get sourceProbePreparation() { return sourceProbe?.preparation ?? null; },
+    get animated() { return sourceSky !== null && (sourceLook.sourceMode === 'golden' || sourceLook.clouds.visible); },
+    setSourceWeather(weather) {
+      sourceWeather.rain=weather.rain;sourceWeather.cloud=weather.cloud;sourceWeather.snow=weather.snow;
+      sourceWeather.flash=weather.flash;sourceWeather.lampBounceK=weather.lampBounceK;sourceWeather.timeSquareDayK=weather.timeSquareDayK;
+      composeWeather();
+    },
+    setSourceHazeActive(active) {
+      if (hazeActive === active) return; hazeActive=active;
+      (scene as unknown as {fogNode:unknown}).fogNode = active ? null : (baked && uFogDensity ? aerialFogNode(baked.texture,uFogDensity) : priorFogNode);
+    },
+    beforeRender(camera, timeS, reducedMotion = false, sourceYOffset = 0) {
+      if (previousSkyTime !== undefined && !reducedMotion && !skyPaused) skyTime += Math.max(0, timeS-previousSkyTime);
+      previousSkyTime=timeS;skyPaused=reducedMotion;
+      if (sourceSky) { sourceSky.sky.position.copy(camera.position); sourceSky.update(skyTime); sourceEnvSky?.update(skyTime); }
+      sourceClouds?.update(camera,skyTime,sourceYOffset);
+    },
+    afterRender(camera, dt) { sourceProbe?.afterRender(camera, dt); composeWeather(); },
     setShadowInterval(interval: number) {
       const next = Math.max(1, Math.min(8, Math.floor(interval)));
       if (next === shadowInterval || !sun) return;
@@ -420,13 +470,15 @@ export function createPhysicalRig(
       } else if (x !== focusX || z !== focusZ) {
         focusX = x;
         focusZ = z;
-        placeSun(PHYSICAL_PRESETS[presetId].sunDirection);
+        placeSun(sourceLook.sunDirection);
         pokeShadow();
       }
     },
     dispose() {
-      if (disposed) return;
+      if (disposed) return disposal;
       disposed = true;
+      const drain = sourceProbe?.dispose();
+      const release = () => {
       for (const object of added) object.removeFromParent();
       if (renderer && clustered) releaseClusteredNode(renderer, clustered, scene);
       if (renderer && features.clustered && priorLighting) renderer.lighting = priorLighting;
@@ -435,13 +487,16 @@ export function createPhysicalRig(
         scene.environment = priorEnvironment;
         scene.environmentIntensity = priorEnvIntensity;
         (scene as unknown as { fogNode: unknown }).fogNode = priorFogNode;
-        sky.geometry.dispose();
-        sky.material.dispose();
+        sourceSky?.dispose();sourceEnvSky?.dispose();sourceClouds?.dispose();
       }
       sun?.dispose();
       hemi?.dispose();
+      bounce?.dispose();
       envTarget?.dispose();
       pmrem?.dispose();
+      };
+      if (drain) { disposal = drain.then(release); return disposal; }
+      release();
     },
   };
 }

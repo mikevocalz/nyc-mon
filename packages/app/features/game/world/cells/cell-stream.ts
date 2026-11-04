@@ -38,6 +38,7 @@
 // its render object keeps that pipeline alive when every cell of the layer
 // has been evicted. Scene passes that set per-object state by name (shadow
 // roles) reach the template, and new cells copy it.
+import { cellWanted, cellInStartSet } from './cell-demand.ts';
 import type { Three } from '@acme/ui/three';
 import type { Node } from 'three/webgpu';
 import type { WorldPreset } from '../../perf/tier-presets.ts';
@@ -235,6 +236,9 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
   const log = options.log;
   const layers: Layer[] = [];
   const slots: Slot[] = [];
+  const groups = new Map<object, Slot[]>();
+  const activeGroups = new Set<object>();
+  const wantedGroups = new Set<object>();
   // The fade mask goes on a layer's own material; a material another mesh also draws with is cloned first, so the
   // dither (a discard, which costs the shared surface its early depth test) stays on the near layers.
   const users = new Map<Material, number>();
@@ -303,6 +307,7 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
     }
     layers.push(layer);
   }
+  let layersChanged=false,initialized=false;
   // External layers: already cut, their template already in the scene.
   const addExternal = (ext: ExternalLayer) => {
     const mesh = ext.template;
@@ -335,8 +340,11 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
       stats.packageBytes += pkg.bytes;
     }
     layers.push(layer);
+    layersChanged=true;
+    if(initialized)options.wake?.();
   };
   for (const ext of options.external ?? []) addExternal(ext);
+  initialized=true;
   // What the budgeted (external) layers hold, kept out of the preset's budget.
   const own = stats.own;
   log?.('packaged', {
@@ -402,6 +410,7 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
     }
     slot.unwantedSince = -1;
     (t.parent ?? root)?.add(mesh);
+    pkg.onAttach?.(mesh);
     stats.cells++;
     stats.bytes += pkg.bytes;
     stats.triangles += triangleCount(pkg);
@@ -434,25 +443,57 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
     hold(slot.layer, slot.pkg, -1);
     // A lazily decoded package drops its arrays with the mesh; it decodes again if it is wanted again.
     slot.pkg.release?.();
+    slot.pkg.releaseResources?.();
   };
 
   // Grouped packages (CellPackage.group): the slots of each group, for fitsGroup.
-  const groups = new Map<object, Slot[]>();
+  // Reserve unbuilt siblings once a cohort starts, so another group cannot take
+  // its remaining draw/geometry budget between cooperative preparation frames.
+  const cleanGroups = () => {
+    for (const key of activeGroups) if (!groups.get(key)?.some(s => s.mesh !== null || s.preparing)) activeGroups.delete(key);
+  };
   const fits = (slot: Slot) => {
-    if (slot.pinned) return true;
     const g = slot.pkg.group ? groups.get(slot.pkg.group) : undefined;
-    if (g && slot.layer.budget && !g.some((s) => s.mesh !== null)) {
-      // a group not yet started starts only if the whole of it fits (members share their layers' budget)
-      const b = slot.layer.budget, h = slot.layer.held;
-      let bytes = 0, tris = 0, verts = 0, cells = 0;
-      for (const s of g) if (s.mesh === null) { bytes += s.pkg.bytes; tris += triangleCount(s.pkg); verts += s.pkg.vertexCount; cells++; }
-      return h.bytes + bytes <= b.geometryBytes && h.cells + cells <= b.cellDraws && h.triangles + tris <= b.triangles
-        && (b.vertices === undefined || h.vertices + verts <= b.vertices);
+    if((g??[slot]).some(member=>member.pkg.suppressed?.()===true))return false;
+    // Legacy slots retain their old quota even when authentic families share a
+    // larger external budget. Reserve unbuilt same-group legacy members too.
+    const quotas = new Set((g ?? [slot]).map(s=>s.pkg.subBudget).filter(q=>q!==undefined));
+    for(const quota of quotas){
+      const considered=new Set<Slot>();
+      for(const s of slots)if(s.mesh!==null&&s.pkg.subBudget===quota)considered.add(s);
+      for(const key of activeGroups)if(wantedGroups.has(key))for(const s of groups.get(key)??[])if(s.pkg.subBudget===quota)considered.add(s);
+      for(const s of g??[slot])if(s.pkg.subBudget===quota)considered.add(s);
+      let bytes=0,cells=0,tris=0,vertices=0;
+      for(const s of considered){bytes+=s.pkg.bytes;cells++;tris+=triangleCount(s.pkg);vertices+=s.pkg.vertexCount;}
+      if(bytes>quota.geometryBytes||cells>quota.cellDraws||tris>quota.triangles||(quota.vertices!==undefined&&vertices>quota.vertices))return false;
     }
+    if (slot.pinned && !slot.pkg.subBudget) return true;
     const b = slot.layer.budget, h = slot.layer.held, t = triangleCount(slot.pkg);
     if (b) {
-      return h.bytes + slot.pkg.bytes <= b.geometryBytes && h.cells + 1 <= b.cellDraws && h.triangles + t <= b.triangles
-        && (b.vertices === undefined || h.vertices + slot.pkg.vertexCount <= b.vertices);
+      if (g?.some(s => s.layer.budget !== b)) throw new Error('A cell cohort must share one external budget');
+      let bytes = 0, tris = 0, verts = 0, cells = 0;
+      const reserve = (members: readonly Slot[]) => {
+        let registeredBytes=0,registeredTris=0,registeredVerts=0;
+        for (const s of members) {
+          const triangles=triangleCount(s.pkg);registeredBytes+=s.pkg.bytes;registeredTris+=triangles;registeredVerts+=s.pkg.vertexCount;
+          if (s.mesh === null) { bytes += s.pkg.bytes; tris += triangles; verts += s.pkg.vertexCount; cells++; }
+        }
+        const declared=members.find(s=>s.pkg.groupBudget)?.pkg.groupBudget;
+        if(declared){
+          if(declared.cells<members.length || declared.bytes<registeredBytes || declared.triangles<registeredTris || declared.vertices<registeredVerts)throw new Error('Registered source cohort exceeds its declared totals');
+          cells+=declared.cells-members.length;bytes+=declared.bytes-registeredBytes;tris+=declared.triangles-registeredTris;verts+=declared.vertices-registeredVerts;
+        }
+      };
+      for (const key of activeGroups) {
+        const members = groups.get(key)!;
+        if (wantedGroups.has(key) && members[0]?.layer.held === h) reserve(members);
+      }
+      if (g) { if (!activeGroups.has(slot.pkg.group!)) reserve(g); }
+      else { bytes += slot.pkg.bytes; tris += t; verts += slot.pkg.vertexCount; cells++; }
+      const allowed = h.bytes + bytes <= b.geometryBytes && h.cells + cells <= b.cellDraws && h.triangles + tris <= b.triangles
+        && (b.vertices === undefined || h.vertices + verts <= b.vertices);
+      if (allowed && g) activeGroups.add(slot.pkg.group!);
+      return allowed;
     }
     return stats.bytes - own.bytes + slot.pkg.bytes <= preset.budget.geometryBytes
       && stats.cells - own.cells + 1 <= preset.budget.cellDraws
@@ -464,9 +505,7 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
 
   /** Wanted at `d` (rise: the load rule; else the keep rule, eased by the hysteresis). */
   const wanted = (layer: Layer, d: number, k: number, rise: boolean) => {
-    if (layer.reachM !== null) return d <= (rise ? layer.reachM : layer.reachM / preset.hysteresis);
-    const sse = (layer.errorM * k) / Math.max(1, d);
-    return sse >= (rise ? preset.screenErrorPx : preset.screenErrorPx * preset.hysteresis);
+    return cellWanted({distance:d,errorM:layer.errorM,k,reachM:layer.reachM,screenErrorPx:preset.screenErrorPx,hysteresis:preset.hysteresis,rise});
   };
   /** The reach in metres (what a package within one chunk of it prefetches against). */
   const reachOf = (layer: Layer, k: number) => (layer.reachM !== null ? layer.reachM : (layer.errorM * k) / preset.screenErrorPx);
@@ -476,7 +515,7 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
   const watched = new WeakSet<Promise<boolean>>();
   let polling = 0;
   const prefetch = (slot: Slot, counted: boolean) => {
-    const p = slot.pkg.prefetch?.();
+    const p = slot.pkg.prefetch?.(counted);
     if (p && typeof p.then === 'function') {
       if (!watched.has(p)) {
         watched.add(p);
@@ -494,10 +533,12 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
   // calls, and requests outlive a pick across frames. A package whose bytes went asks for them again and builds on a
   // later frame; reading its attributes now would throw.
   const lostBytes = (slot: Slot) => {
-    if (!slot.pkg.ready || slot.pkg.ready()) return false;
-    prefetch(slot, true);
-    stats.fetching++;
-    return true;
+    let missing = false;
+    for (const sibling of (slot.pkg.group ? groups.get(slot.pkg.group) : undefined) ?? [slot]) {
+      if (sibling.mesh !== null || !sibling.pkg.ready || sibling.pkg.ready()) continue;
+      prefetch(sibling, true); stats.fetching++; missing = true;
+    }
+    return missing;
   };
 
   const pick = (camera: Vec3, k: number, nowS: number, radius: number) => {
@@ -505,39 +546,66 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
     requests.length = 0;
     stats.fetching = 0;
     polling = 0;
+    wantedGroups.clear();
+    // A cohort is one demand unit even when individual material bounds differ.
+    // Otherwise one requested part can reserve space for a sibling that never
+    // enters the request queue. Keep actual geometry bounds unchanged.
+    const groupDemand = new Map<object, { distance: number; want: boolean; keep: boolean; prefetch: boolean; suppressed:boolean }>();
+    for (const [key, members] of groups) {
+      let distance = Infinity;
+      for (const member of members) distance = Math.min(distance, boxDistance(member.pkg.demandBounds ?? member.pkg.bounds, camera.x, camera.y, camera.z));
+      const demand = { distance, want: false, keep: false, prefetch: false, suppressed:members.some(member=>member.pkg.suppressed?.()===true) };
+      if (!demand.suppressed) for (const member of members) {
+        const layer = member.layer, slotRadius = layer.reachM !== null ? Math.max(radius, layer.reachM) : radius;
+        demand.want ||= member.pinned || (distance <= slotRadius && wanted(layer, distance, k, true));
+        demand.keep ||= member.pinned || (distance <= Math.max(radius + CELL, slotRadius + layer.chunk) && wanted(layer, distance, k, false));
+        demand.prefetch ||= distance <= Math.min(slotRadius, reachOf(layer, k) + layer.chunk);
+      }
+      groupDemand.set(key, demand);
+      if (demand.want) wantedGroups.add(key);
+    }
     for (const slot of slots) {
       // A reachM layer's radius is its own reach (the far tier streams to 13 km while the near detail stays at the
       // preset's residentRadiusM); reachM at or under the preset's radius changes nothing (lane C's 60 m and 360 m).
       const slotRadius = slot.layer.reachM !== null ? Math.max(radius, slot.layer.reachM) : radius;
       const keepRadius = Math.max(radius + CELL, slotRadius + slot.layer.chunk);
-      const d = boxDistance(slot.pkg.bounds, camera.x, camera.y, camera.z);
+      const demand = slot.pkg.group ? groupDemand.get(slot.pkg.group) : undefined;
+      const d = demand?.distance ?? boxDistance(slot.pkg.demandBounds ?? slot.pkg.bounds, camera.x, camera.y, camera.z);
       slot.distance = d;
       const resident = slot.mesh !== null && slot.fading !== -1;
+      if(demand?.suppressed || slot.pkg.suppressed?.()){
+        if(slot.mesh){if(slot.layer.fade)slot.fading=-1;else evict(slot);}
+        else{slot.pkg.release?.();slot.pkg.releaseResources?.();slot.preparing=false;}
+        continue;
+      }
       if (slot.pinned) {
         if (slot.mesh === null) requests.push(slot);
         else if (slot.fading === -1) slot.fading = 1;
         continue;
       }
       if (resident) {
-        const keep = d <= keepRadius && wanted(slot.layer, d, k, false) && !slot.pkg.suppressed?.();
+        const keep = demand?.keep ?? (d <= keepRadius && wanted(slot.layer, d, k, false) && !slot.pkg.suppressed?.());
         if (keep) slot.unwantedSince = -1;
         else if (slot.unwantedSince < 0) slot.unwantedSince = nowS;
         else if (nowS - slot.unwantedSince >= preset.evictAfterS) {
           if (slot.layer.fade) slot.fading = -1;
           else evict(slot);
         }
-      } else if (d <= slotRadius && wanted(slot.layer, d, k, true) && !slot.pkg.suppressed?.()) {
+      } else if (demand?.want ?? (d <= slotRadius && wanted(slot.layer, d, k, true) && !slot.pkg.suppressed?.())) {
         // A leaving near cell that is wanted again turns around where it is.
         if (slot.mesh !== null) { slot.fading = 1; slot.unwantedSince = -1; continue; }
         // bytes still on their way: ask for them, build once they are in
         if (slot.pkg.ready && !slot.pkg.ready()) { prefetch(slot, true); stats.fetching++; continue; }
         requests.push(slot);
-      } else if (slot.mesh === null && slot.pkg.prefetch && d <= Math.min(slotRadius, reachOf(slot.layer, k) + slot.layer.chunk)) {
+      } else if (slot.mesh === null && slot.pkg.prefetch && (demand?.prefetch ?? (d <= Math.min(slotRadius, reachOf(slot.layer, k) + slot.layer.chunk)))) {
         // the prefetch ring: one chunk past the reach, so a cell's bytes are in before it is wanted
         prefetch(slot, false);
+      } else if (slot.mesh === null) {
+        slot.pkg.releaseResources?.();
       }
     }
-    for (const slot of previousRequests) if (!requests.includes(slot)) { slot.pkg.release?.(); slot.preparing = false; }
+    for (const slot of previousRequests) if (!requests.includes(slot)) { slot.pkg.release?.(); slot.pkg.releaseResources?.(); slot.preparing = false; }
+    cleanGroups();
     requests.sort((a, b) => (a.pinned === b.pinned ? a.distance - b.distance : a.pinned ? -1 : 1));
   };
 
@@ -573,9 +641,16 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
       pick(camera, k, 0, preset.residentRadiusM);
       let built = 0;
       for (const slot of requests) {
-        if (!slot.pinned && slot.distance > startRadius) continue;
+        if (!cellInStartSet({wanted:true,pinned:slot.pinned,distance:slot.distance,startRadius})) continue;
         if (lostBytes(slot)) continue;
         if (!fits(slot)) { refuse(slot); continue; }
+        // START is before reveal: drain cooperative CPU preparation so all
+        // registered per-cell resources exist before attachment and CPU release.
+        if (slot.pkg.prepare) {
+          slot.preparing = true;
+          if (!slot.pkg.prepare(Infinity, now)) continue;
+          slot.preparing = false;
+        }
         build(slot, false);
         built++;
       }
@@ -588,6 +663,7 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
       });
     },
     update(camera, k, nowS) {
+      if(layersChanged){last.at=-Infinity;layersChanged=false;}
       advanceTemplates();
       const dt = Number.isFinite(last.frameAt) ? Math.min(0.1, Math.max(0, nowS - last.frameAt)) : 0;
       last.frameAt = nowS;
@@ -624,6 +700,7 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
       requests.splice(0, i);
       stats.pending = requests.length + stats.fetching;
       const fading = advanceFades(dt);
+      cleanGroups();
       if (log && (stats.builtThisFrame > 0 || stats.buildMsThisFrame > 0)) {
         log('frame', {
           built: stats.builtThisFrame, buildMs: +stats.buildMsThisFrame.toFixed(2), cells: stats.cells,
@@ -642,7 +719,7 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
     dispose() {
       for (const slot of slots) {
         if (slot.mesh) evict(slot);
-        else if (slot.preparing) slot.pkg.release?.();
+        else { if (slot.preparing) slot.pkg.release?.(); slot.pkg.releaseResources?.(); }
       }
       // The template geometry stays with its mesh, whose builder disposes it (city-mesh.ts, facelift, road paint);
       // only a material this module cloned is its own.
@@ -650,6 +727,8 @@ export function createCellStream(THREE: Three, meshes: readonly Mesh[], options:
       slots.length = 0;
       layers.length = 0;
       groups.clear();
+      activeGroups.clear();
+      wantedGroups.clear();
     },
   };
 }

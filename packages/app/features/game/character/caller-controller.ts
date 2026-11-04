@@ -26,6 +26,7 @@ import {
   turnToward,
   wrapAngle,
 } from './locomotion.ts';
+import { findLocalSeparation } from './depenetration.ts';
 import type { WorldQueries } from './walkability.ts';
 
 /** The controls held right now. The router's latest stick reading plus the hold caps. */
@@ -47,6 +48,7 @@ export const RELEASED_CONTROLS: CallerControls = Object.freeze({ stickX: 0, stic
  * (block-settle.ts), which waits while a recentre swings.
  */
 export interface ChaseState {
+  readonly collisionRevision?: number;
   readonly recentreYaw: number | null;
   readonly settle: BlockSettleState;
 }
@@ -145,9 +147,20 @@ export function stepGameFrame(
 ): GameFrameResult {
   const step = clampDt(dt);
   let camera = frame.camera;
+  const collisionRevision = world.collisionRevision?.();
+  let beforeMove = frame.caller;
+  if (Number.isSafeInteger(collisionRevision) && collisionRevision !== frame.chase.collisionRevision && beforeMove.spawned && !world.isWalkable(beforeMove.x,beforeMove.z)) {
+    const safe = findLocalSeparation(beforeMove.x,beforeMove.z,world.isWalkable);
+    if (safe) {
+      // Correction is not a footstep: retain heading, jump, gait phase and saved
+      // lens/orbit settings. Translate only the chase anchor by the same delta.
+      camera={...camera,x:camera.x+safe.x-beforeMove.x,z:camera.z+safe.z-beforeMove.z};
+      beforeMove={...beforeMove,x:safe.x,z:safe.z,groundY:world.groundHeight(safe.x,safe.z)};
+    }
+  }
   if (controls.engaged && controls.look) camera = moveCityCamera(camera, lookAroundAction(controls.stickX, step));
   let settle = latchSteering(frame.chase.settle, controls);
-  const caller = stepCaller(frame.caller, controls, steeringYaw(camera, settle), step, world);
+  const caller = stepCaller(beforeMove, controls, steeringYaw(camera, settle), step, world);
   let recentreYaw = frame.chase.recentreYaw;
   if (caller.spawned) {
     camera = chaseCamera(camera, { x: caller.x, z: caller.z, heading: caller.heading, align: recentreYaw !== null ? 0 : alignStrength(controls, caller.speed) }, step, reducedMotion);
@@ -156,7 +169,7 @@ export function stepGameFrame(
       camera = swung.camera;
       if (swung.done) recentreYaw = null;
     }
-    const moving = caller.x !== frame.caller.x || caller.z !== frame.caller.z;
+    const moving = caller.x !== beforeMove.x || caller.z !== beforeMove.z;
     const settled = stepBlockSettle(settle, camera, controls, { x: caller.x, z: caller.z, heading: caller.heading, moving }, step, reducedMotion, streets, frame.chase.recentreYaw !== null);
     settle = settled.settle;
     camera = settled.camera;
@@ -164,7 +177,7 @@ export function stepGameFrame(
     // around it. Keep the chase anchor on their valid position in that case.
     if (!world.isWalkable(camera.x, camera.z)) camera = { ...camera, x: caller.x, z: caller.z };
   }
-  const chase: ChaseState = recentreYaw === frame.chase.recentreYaw && settle === frame.chase.settle ? frame.chase : { recentreYaw, settle };
+  const chase: ChaseState = recentreYaw === frame.chase.recentreYaw && settle === frame.chase.settle && collisionRevision === frame.chase.collisionRevision ? frame.chase : { ...frame.chase, recentreYaw, settle, collisionRevision };
   const following = caller.spawned && Math.hypot(camera.x - caller.x, camera.z - caller.z) > 0.01;
   const active = controls.engaged || isAirborne(caller.jump) || recentreYaw !== null || isSettling(settle) || following;
   return { caller, camera, chase, active };
@@ -206,7 +219,7 @@ export function jumpCaller(state: CallerState): CallerState {
 /** The X cap: swing the camera behind the Caller. Any block settle in flight gives way. */
 export function recentreChase(state: CallerState, chase: ChaseState = IDLE_CHASE): ChaseState {
   if (!state.spawned) return { ...chase, recentreYaw: null };
-  return { recentreYaw: yawBehind(state.heading), settle: { ...chase.settle, targetYaw: null } };
+  return { ...chase, recentreYaw: yawBehind(state.heading), settle: { ...chase.settle, targetYaw: null } };
 }
 
 /** Spoken by the C cap until interactables exist. Proposed copy row `g01.caller.interact.none`. */

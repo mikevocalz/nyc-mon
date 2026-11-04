@@ -15,10 +15,13 @@ public final class KeychainWidgetModule: Module {
   public func definition() -> ModuleDefinition {
     Name("KeychainWidget")
 
+    OnCreate { MonWatchSender.shared.start() }
+
     /// Writes the snapshot and reloads the widget. Returns false when the App Group is missing (a build without the plugin).
     Function("write") { (json: String) -> Bool in
       guard let defaults = KeychainStore.defaults() else { return false }
       defaults.set(json, forKey: KeychainStore.snapshotKey)
+      MonWatchSender.shared.publish()
       WidgetCenter.shared.reloadTimelines(ofKind: KeychainStore.widgetKind)
       return true
     }
@@ -27,6 +30,7 @@ public final class KeychainWidgetModule: Module {
     Function("clear") { () -> Bool in
       guard let defaults = KeychainStore.defaults() else { return false }
       defaults.removeObject(forKey: KeychainStore.snapshotKey)
+      MonWatchSender.shared.publish()
       WidgetCenter.shared.reloadTimelines(ofKind: KeychainStore.widgetKind)
       return true
     }

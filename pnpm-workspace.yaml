@@ -11,8 +11,8 @@ overrides:
   react-dom: 19.3.0
   "@expo/dom-webview": 58.0.2
 
-# @reactvision/react-viro is vendored at vendor/reactvision-react-viro-3.0.2-moyo.1.tgz:
-# an npm pack of the mikevocalz/viro fork pinned at commit 5393d00744f4. The
+# @reactvision/react-viro is vendored at vendor/reactvision-react-viro-3.0.3-moyo.1.tgz:
+# an npm pack of the mikevocalz/viro fork pinned at commit 98babbc1dc8b4e1357a6ab9283691025b2a3413c. The
 # fork is a private repo, so a git/tarball URL would fail in CI without
 # credentials. Regenerate with: npm pack the pinned checkout (dist/ is
 # committed upstream, so no build step is needed). Its peer range covers Expo
@@ -28,7 +28,7 @@ overrides:
 allowBuilds:
   # false: the vendored tarball ships the fork's committed dist/; there is no
   # build to run. Bump the tarball together with the catalog pin.
-  "@reactvision/react-viro@file:vendor/reactvision-react-viro-3.0.2-moyo.1.tgz": false
+  "@reactvision/react-viro@file:vendor/reactvision-react-viro-3.0.3-moyo.1.tgz": false
   # kinetrell ships source for git consumers; its `prepare` runs tsdown to
   # emit dist/ (the exports map only resolves against built files).
   "kinetrell@https://codeload.github.com/mikevocalz/Kinetrell/tar.gz/344de51531ce050c4311d3feb70e4d596bdc8041": true
@@ -174,7 +174,7 @@ catalog:
   "@typegpu/gl": 0.12.8
 
   # spatial / XR / Rive
-  "@reactvision/react-viro": file:vendor/reactvision-react-viro-3.0.2-moyo.1.tgz
+  "@reactvision/react-viro": file:vendor/reactvision-react-viro-3.0.3-moyo.1.tgz
   "@reactvision/viro-web-renderer": 1.0.1
   "@metavr/layout-compat": 1.0.0
   "@metavr/layout-window-compat": 1.0.0

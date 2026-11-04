@@ -1,3 +1,5 @@
+import type { InitialAssetProgress } from '../scene-build-progress.ts';
+import type { SourceLook } from './source-look.ts';
 import { finishPreparation } from '../scene-preparation.ts';
 // The Harlem world: sky, ground, the baked city meshes, trees and lights,
 // built once per scene from a parsed tile. city-scene.ts owns the camera and
@@ -73,6 +75,9 @@ export interface CityWorldStats extends CityMeshStats {
 }
 
 export interface CityWorldOptions {
+  onAssetProgress?(event:InitialAssetProgress):void;
+  /** Capabilities of this scene renderer's initialized GPUDevice, never adapter-only support. */
+  hasTextureFeature?(name: string): boolean;
   /**
    * Build progress, 0..1, at the build's checkpoints (materials, meshes, facelift, trees, props, lights). The load
    * bar and START's no-progress watchdog read it (load-game-scene.ts): the build is synchronous, but on the render
@@ -381,8 +386,11 @@ export function* prepareCityWorld(THREE: Three, dataset: CityDatasetV3, options:
     const vdPort = vd
       ? yield* (function* () {
         const preparation = prepareVdPort(THREE, dataset, {
+          wake: options.stream?.wake,
+          onAssetProgress: options.onAssetProgress,
           log: options.stream?.log,
           physical: phys !== null,
+          ...(options.hasTextureFeature ? { hasTextureFeature: options.hasTextureFeature } : {}),
           night: vdNight(tod),
           groundY: createWalkQueries(dataset).groundHeight,
           sunDirection: sunDirection,
@@ -447,6 +455,7 @@ export function* prepareCityWorld(THREE: Three, dataset: CityDatasetV3, options:
     completed = true;
     return {
       group,
+      ready: vdPort?.ready,
       sky,
       fog,
       horizon,
@@ -455,6 +464,7 @@ export function* prepareCityWorld(THREE: Three, dataset: CityDatasetV3, options:
       /** vd lane weather levels, null on the other lanes. */
       weather: (vdMaterials?.weather ?? null) as VdWeather | null,
       /** Rain and snow, 0..1 each; a no-op off the vd lane. */
+      applySourceLook(look: SourceLook) { vdPort?.applySourceLook(look); },
       setWeather(rain: number, snowLevel: number) {
         if (!vdMaterials) return;
         vdMaterials.weather.wet.value = Math.max(0, Math.min(1, rain));
@@ -523,15 +533,18 @@ export function* prepareCityWorld(THREE: Three, dataset: CityDatasetV3, options:
        * Builds the START set (stream.prime): cells within `startRadius` of the camera, now. `k` is the screen-error
        * scale (perf/tier-presets.ts screenErrorScale). No-op without streaming.
        */
+      setPrepareTemplates(prepare: NonNullable<import('./vd-port/types.ts').VdPortCtx['prepareTemplates']>) { vdPort?.setPrepareTemplates(prepare); },
       primeStream(camera: Vec3, k: number, startRadius: number) {
+        vdPort?.prime(camera,k,startRadius);
         stream?.prime(camera, k, startRadius);
       },
       /** One streaming frame; true while cells are still to build or fading. No-op (false) without streaming. */
-      updateStream(camera: Vec3, k: number, nowS: number): boolean {
+      updateStream(camera: Vec3, k: number, nowS: number,reducedMotion=false): boolean {
+        const sourceBusy = vdPort?.demand(camera,k) ?? false;
         const busy = stream ? stream.update(camera, k, nowS) : false;
         // After the cells moved: the vd port's near mask reads which near cells are in.
-        vdPort?.update(nowS);
-        return busy;
+        vdPort?.update(nowS,reducedMotion);
+        return busy || sourceBusy || (!reducedMotion && vdPort?.animated===true);
       },
       /** The night light pools, null unless `nightLights` was passed under `physical`. */
       nightLights: night,

@@ -2,7 +2,7 @@
 // through the renderer's onProgress, and puts the renderer's target and MRT back after.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { cityCompilePass, compileForFrames, type CompilePass } from './compile-pass.ts';
+import { cityCompilePass, compileForFrames, restoreCompileForFrame, type CompilePass } from './compile-pass.ts';
 
 function fakeRenderer() {
   const calls: { scene: unknown; camera: unknown; target: unknown; mrt: unknown; onProgress: unknown }[] = [];
@@ -50,6 +50,10 @@ test('with onProgress: compiles in the pass target and MRT, synchronously, then 
   assert.equal(pass.renderTarget.texture.type, 1016);
   assert.equal(pass.renderTarget.depthTexture!.type, 1015);
   assert.equal(pass.passCompiles, 0);
+  assert.deepEqual(state(), { target: 'canvas-target', mrt: 'canvas-mrt' }, 'pending preparation cannot redirect a visible frame');
+  renderer.setRenderTarget(pass.renderTarget); renderer.setMRT(pass._mrt);
+  restoreCompileForFrame(scene);
+  assert.deepEqual(state(), { target: 'canvas-target', mrt: 'canvas-mrt' }, 'a resumed compile slice is reset before drawing');
   finish();
   await done;
   assert.deepEqual(state(), { target: 'canvas-target', mrt: 'canvas-mrt' });

@@ -31,6 +31,9 @@ type CompileRenderer = {
 const FLOAT_TYPE = 1015;
 
 export const cityCompilePass = new WeakMap<object, CompilePass>();
+const pendingFrameRestore = new WeakMap<object, () => void>();
+/** An async compile may reapply its captured target after yielding. Visible frames own the canvas context. */
+export function restoreCompileForFrame(scene: object): void { pendingFrameRestore.get(scene)?.(); }
 
 /**
  * Compiles `scene` the way its frames render it: through its post pass when it has one. With `onProgress`, the
@@ -56,15 +59,26 @@ export function compileForFrames(
   if (!onProgress || !pass.scene || !pass.camera || !renderer.setRenderTarget || !renderer.setMRT) return pass.compileAsync(renderer);
   const previousTarget = renderer.getRenderTarget?.() ?? null;
   const previousMRT = renderer.getMRT?.() ?? null;
-  renderer.setRenderTarget(rt);
-  renderer.setMRT(pass._mrt ?? null);
-  const compiling = renderer.compileAsync(pass.scene as never, pass.camera as never, null, onProgress as never);
   const restore = () => {
     renderer.setRenderTarget?.(previousTarget);
     renderer.setMRT?.(previousMRT);
   };
+  const settled = () => {
+    restore();
+    if (pendingFrameRestore.get(scene) === restore) pendingFrameRestore.delete(scene);
+  };
+  pendingFrameRestore.set(scene, restore);
+  let compiling: Promise<unknown>;
+  try {
+    renderer.setRenderTarget(rt);
+    renderer.setMRT(pass._mrt ?? null);
+    compiling = renderer.compileAsync(pass.scene as never, pass.camera as never, null, onProgress as never);
+  } catch (error) { settled(); throw error; }
+  // The initialized renderer captured its list/context before its first yield.
+  // Do not leave a texture which the post graph samples bound as the frame's output.
+  restore();
   return compiling.then(
-    (value) => { restore(); return value; },
-    (error: unknown) => { restore(); throw error; },
+    (value) => { settled(); return value; },
+    (error: unknown) => { settled(); throw error; },
   );
 }

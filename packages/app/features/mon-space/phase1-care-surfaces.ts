@@ -1,4 +1,6 @@
 import { advanceCare, listUnmetNeeds } from '@acme/core/sim';
+import type { MonLingo } from '@acme/content/voice';
+import { watchPresentation } from './watch-presentation.ts';
 import type { CareState, MonInstance, SaveCurrent } from '@acme/core/types';
 import { CARE_HORIZON_MS, type PredictedCall } from './care-notification-plan.ts';
 import type { MonCareSurfacesInput } from './publish-mon-care.ts';
@@ -7,11 +9,12 @@ import { careConsentAllowed } from './care-surface-owner.ts';
 /** The save's Caller identity is independent of its authentication user ID. */
 export function careSurfacesFromSave(
   save: SaveCurrent | undefined, activeMonInstanceId: string | undefined, now: number, name: (mon: MonInstance) => string,
+  lingo?: MonLingo,
 ): MonCareSurfacesInput | null {
   const mon = save?.mons.find((entry) => entry.monInstanceId === activeMonInstanceId);
   const care = save?.care.find((entry) => entry.monInstanceId === activeMonInstanceId);
   if (!careConsentAllowed(save) || !mon || !care || mon.callerId !== save?.caller?.callerId) return null;
-  return phase1CareSurfaces(mon, care, name(mon), now);
+  return phase1CareSurfaces(mon, care, name(mon), now, lingo);
 }
 
 /** The current companion simulation owns these meters and attention events.
@@ -19,7 +22,7 @@ export function careSurfacesFromSave(
  * stay inactive here until the simulation supports them; no new care rules
  * or persisted state are introduced by the widget adapter.
  */
-export function phase1CareSurfaces(mon: MonInstance, care: CareState, name: string, now: number): MonCareSurfacesInput {
+export function phase1CareSurfaces(mon: MonInstance, care: CareState, name: string, now: number, lingo?: MonLingo): MonCareSurfacesInput {
   const current = advanceCare({ mon, care }, now).state;
   const future = advanceCare(current, now + CARE_HORIZON_MS);
   const predictions: PredictedCall[] = [];
@@ -39,6 +42,7 @@ export function phase1CareSurfaces(mon: MonInstance, care: CareState, name: stri
   }
   const hearts = (value: number): 0 | 1 | 2 | 3 | 4 => Math.max(0, Math.min(4, Math.ceil(value * 4))) as 0 | 1 | 2 | 3 | 4;
   return {
+    watch: watchPresentation(mon, current.care, now, lingo),
     monInstanceId: mon.monInstanceId,
     monName: name,
     now,

@@ -1,6 +1,9 @@
 // isWalkable and cityGroundHeight bound to the bundled Harlem tile, built on
 // first use. Kept apart from walkability.ts so node tests of the pure maths
 // never import the tile JSON.
+import { residentSourceBlocked } from '../resident-collision.ts';
+import { authoredBuildingBlocked } from './vd-port/blocks/building-colliders.ts';
+import { BODY_RADIUS } from './walkability.ts';
 import { bundledCity } from '../city-data.ts';
 import { buildObstacles } from './obstacles.ts';
 import { createStreetClearance, createWalkQueries, type WalkQueries } from './walkability.ts';
@@ -24,7 +27,7 @@ function queries(): WalkQueries {
   // query is byte-identical to before — the same composition obstacles take.
   const genBlocked = EXPERIMENTAL_WORLD_GEN ? createGenBlockedFor(city.dataset, walk.groundHeight) : null;
   bundled = {
-    isWalkable: (x, z) => walk.isWalkable(x, z) && !obstacles.blocked(x, z) && !(genBlocked?.(x, z) ?? false),
+    isWalkable: (x, z) => walk.isWalkable(x, z) && !authoredBuildingBlocked(x, walk.groundHeight(x, z) + 0.9, z, BODY_RADIUS) && !residentSourceBlocked(x, walk.groundHeight(x, z) + 0.3, z, BODY_RADIUS, true) && !residentSourceBlocked(x, walk.groundHeight(x, z) + 0.9, z, BODY_RADIUS, true) && !residentSourceBlocked(x, walk.groundHeight(x, z) + 1.5, z, BODY_RADIUS, true) && !obstacles.blocked(x, z) && !(genBlocked?.(x, z) ?? false),
     groundHeight: walk.groundHeight,
   };
   return bundled;

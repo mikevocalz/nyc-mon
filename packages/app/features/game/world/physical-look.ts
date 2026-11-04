@@ -19,6 +19,10 @@
 // "Slop measured" marks a value copied from Slop; TODO(tune) marks a value
 // nyc-mon chose that still needs an iPhone 17 / iPad Pro frame.
 import { parseDefaultOnFlag } from './sky-rig.ts';
+// Authored Valdrada appearance has its own linear-light/display contract;
+// legacy Slop feature probes and renderer budgets below keep their existing IDs.
+export { resolveSourceLook } from './source-look.ts';
+export type { SourceLook, SourceLookWeather } from './source-look.ts';
 
 /** Master flag, default on; EXPO_PUBLIC_WORLD_PHYSICAL=0 is the kill switch. */
 export const EXPERIMENTAL_WORLD_PHYSICAL = parseDefaultOnFlag(process.env.EXPO_PUBLIC_WORLD_PHYSICAL);

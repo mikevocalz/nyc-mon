@@ -12,6 +12,7 @@ try {
   process.exit(1);
 }
 
+const pinnedSource = JSON.parse(readFileSync(new URL('../../../vendor/reactvision-react-viro-3.0.3-moyo.1.SOURCE.json', import.meta.url), 'utf8'));
 const root = dirname(packageJsonPath);
 const pkg = JSON.parse(readFileSync(packageJsonPath, 'utf8'));
 const platformSource = join(root, 'components/Utilities/ViroPlatform.ts');
@@ -47,6 +48,7 @@ const sdk58PeerLane =
   rnPeers.includes('<0.89');
 
 const forkCompatible =
+  pkg.version === pinnedSource.version &&
   sdk58PeerLane &&
   hasPico &&
   hasMetaHorizonRuntime &&
@@ -66,7 +68,7 @@ Resolved version:
   ${pkg.version ?? 'unknown'}
 
 The pnpm-workspace.yaml catalog pins @reactvision/react-viro to
-github:mikevocalz/viro at a commit on main. Something resolved a different
+the vendored ${pinnedSource.version} fork at ${pinnedSource.commit}. Something resolved a different
 copy (an override, a stale install, or the public npm package), and that copy
 lacks the capabilities below. The public package is NOT accepted for Expo
 SDK 58 native/headset builds.
@@ -75,6 +77,7 @@ Restore the catalog pin and its matching allowBuilds entry, then:
 
   pnpm install
 
+Required fork version: ${pinnedSource.version}
 Required fork capabilities:
   Expo <59 peer lane
   React Native <0.89 peer lane

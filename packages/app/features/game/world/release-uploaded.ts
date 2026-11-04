@@ -70,11 +70,16 @@ export type UploadedProbe = (resource: object) => boolean;
 
 /** A probe for a three WebGPURenderer's backend data. */
 export function backendUploaded(renderer: { backend: unknown }): UploadedProbe {
+  const textures = (renderer as { backend: unknown; _textures?: unknown })._textures as { get(resource: object): { initialized?: boolean; isDefaultTexture?: boolean; version?: number } } | undefined;
   const backend = renderer.backend as { has?(o: object): boolean; get(o: object): { buffer?: unknown; texture?: unknown } };
   return (resource) => {
     // A texture never flagged for upload (version 0) holds three's 1x1 default texture, not its pixels.
     const texture = resource as { isTexture?: boolean; version?: number };
-    if (texture.isTexture === true && !(texture.version! > 0)) return false;
+    if (texture.isTexture === true) {
+      if (!(texture.version! > 0) || !textures) return false;
+      const state = textures.get(resource);
+      if (state.initialized !== true || state.isDefaultTexture === true || state.version !== texture.version) return false;
+    }
     if (typeof backend.has === 'function' && !backend.has(resource)) return false;
     const data = backend.get(resource);
     return data.buffer !== undefined || data.texture !== undefined;
@@ -82,6 +87,8 @@ export function backendUploaded(renderer: { backend: unknown }): UploadedProbe {
 }
 
 export interface UploadedReleaserOptions {
+  /** Preparation may release copied vertex buffers before a draw; default textures are not proof of uploaded pixels. */
+  textures?: boolean;
   /** Consecutive `release` calls a resource must read as uploaded first. Default RELEASE_SETTLE_FRAMES. */
   settleFrames?: number;
 }
@@ -143,7 +150,7 @@ export function createUploadedReleaser(root: Object3D, options: UploadedReleaser
     };
     if (mesh.isMesh !== true || !mesh.geometry) return;
     const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    for (const m of materials) visitMaterial(m, 0);
+    if (options.textures !== false) for (const m of materials) visitMaterial(m, 0);
     // Instanced meshes (trees, cars, rain) refill their instance attributes
     // as the Caller moves; those are InstancedBufferAttributes and stay. The
     // per-vertex model geometry under them is static and goes like the rest.

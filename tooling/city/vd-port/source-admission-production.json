@@ -1,0 +1,5 @@
+{
+  "materialBytes": 402653184,
+  "budget": { "name": "authored-blocks", "geometryBytes": 167772160, "cellDraws": 128, "triangles": 1100000 },
+  "legacyMinimum": { "geometryBytes": 25165824, "cellDraws": 12, "triangles": 350000 }
+}

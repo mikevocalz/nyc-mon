@@ -4,6 +4,12 @@ import Foundation
 /// in packages/app/features/mon-space/keychain-snapshot.ts (version 1);
 /// change both together. Times are epoch milliseconds, as JS writes them.
 struct KeychainSnapshot: Codable, Equatable {
+  struct Watch: Codable, Equatable {
+    let speciesId: String
+    let hello: String
+    let hungry: String
+  }
+  var watch: Watch? = nil
   struct Hearts: Codable, Equatable {
     let fullness: Int
     let energy: Int

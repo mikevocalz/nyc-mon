@@ -8,6 +8,8 @@ import { test } from 'node:test';
 import * as THREE from 'three/webgpu';
 import { VD_PBR_BIN, VD_PBR_LAYER_SIZE, VD_PBR_LAYERS, VD_PBR_SETS } from './data/pbr-sets.ts';
 import { createPbrMaterial, loadPbrTextures, type PbrDescriptor } from './pbr-material.ts';
+import { createMaterialTable } from '../blocks/material-table.ts';
+import { sourcePatternFrame } from '../blocks/source-frame.ts';
 
 const bin = (name: string) => {
   const b = readFileSync(new URL(`./assets/${name}`, import.meta.url));
@@ -98,8 +100,83 @@ test('two sets and three option sets build into one shader and one pipeline', as
   for (const t of arrays) assert.equal(t.mipLevelCount, Math.log2(VD_PBR_LAYER_SIZE) + 1);
 });
 
-test('a descriptor with per-vertex weathering is refused (not ported)', () => {
+test('required per-vertex weathering inputs and unbaked sets are refused', () => {
   const tex = { albedo: null as never, orm: null as never };
-  assert.throws(() => createPbrMaterial(THREE as never, { ...CONCRETE, weatherAttr: true }, { night: THREE.TSL.uniform(0) as never, physical: true, ...tex }), /not ported/);
+  assert.throws(() => createPbrMaterial(THREE as never, { ...CONCRETE, weatherAttr: true }, { night: THREE.TSL.uniform(0) as never, physical: true, ...tex }), /attribute inputs are missing/);
   assert.throws(() => createPbrMaterial(THREE as never, { ...CONCRETE, set: 'asphalt' }, { night: THREE.TSL.uniform(0) as never, physical: true, ...tex }), /not baked/);
+});
+
+
+test('shared parameter nodes replace only declared PBR inputs and retain caller ownership', () => {
+  const albedo = new THREE.DataArrayTexture(new Uint8Array(4), 1, 1, 1);
+  const orm = new THREE.DataArrayTexture(new Uint8Array(4), 1, 1, 1);
+  const seed = THREE.TSL.float(17);
+  const layer = THREE.TSL.float(0);
+  const material = createPbrMaterial(THREE as never, CONCRETE, {
+    night: THREE.TSL.float(0) as never, physical: true, albedo, orm,
+    parameterNodes: { pbSeed: seed, layer },
+  });
+  assert.equal(material.userData.pbrUniforms.pbSeed, seed);
+  assert.equal(material.userData.pbrUniforms.layer, layer);
+  assert.notEqual(material.userData.pbrUniforms.pbRough, seed);
+  assert.throws(() => createPbrMaterial(THREE as never, CONCRETE, {
+    night: THREE.TSL.float(0) as never, physical: true, albedo, orm,
+    parameterNodes: { undeclared: seed },
+  }), /unknown parameter node undeclared/);
+  const authored = createPbrMaterial(THREE as never, { ...CONCRETE, set: 'authored-bank-only-set' }, {
+    night: THREE.TSL.float(0), physical: true, albedo, orm, setLayout: { layer: 0, b: 'alpha', metal: 0.2, alphaConst: 1 },
+  });
+  assert.equal(authored.userData.pbr.layer, 0);
+  assert.throws(() => createPbrMaterial(THREE as never, CONCRETE, {
+    night: THREE.TSL.float(0), physical: true, albedo, orm, setLayout: { layer: 1, b: 'alpha' },
+  }), /outside its resident bank/);
+  authored.dispose();
+  let textureDisposals = 0;
+  albedo.addEventListener('dispose', () => { textureDisposals++; });
+  material.dispose();
+  assert.equal(textureDisposals, 0, 'shared texture bank lifetime belongs to its owner');
+  albedo.dispose(); orm.dispose();
+});
+
+test('material-ID parameter lookup compiles as unfiltered RGBA32F textureLoad on installed WebGPU', async () => {
+  const { installGpuGlobals, recordingCanvas, recordingGpuDevice } = await import('../../../render-runtime/recording-gpu.test-support.ts');
+  installGpuGlobals();
+  const { device, record } = recordingGpuDevice();
+  const renderer = new THREE.WebGPURenderer({ canvas: recordingCanvas(64, 64), device } as never);
+  await renderer.init();
+  const table = createMaterialTable(THREE, { name: 'test:building-descriptors', columns: 1, rows: 2, values: new Float32Array([17, 0, 0.25, 0, 41, 0, 1, 0]) });
+  const id = THREE.TSL.varying(THREE.TSL.attribute('aVdSurface', 'vec4').x).setInterpolation('flat');
+  const seed = table.texel(id, 0).r;
+  const environmentIntensityNode = table.texel(id, 0).b;
+  const textures = loadPbrTextures(THREE as never, { albedo: bin('pbr-albedo.bin'), orm: bin('pbr-orm.bin') });
+  const weather = THREE.TSL.varying(THREE.TSL.attribute('aVdWeather', 'vec4')).setInterpolation('flat');
+  const grime = THREE.TSL.attribute('aVdSurface', 'vec4').z;
+  const attributeNodes = { weather, grime, weatherEnabled: THREE.TSL.uniform(1), grimeEnabled: THREE.TSL.uniform(1), dirtEnabled: THREE.TSL.uniform(1) };
+  const frame = sourcePatternFrame(THREE, { position: THREE.TSL.positionWorld, normal: THREE.TSL.normalWorldGeometry,
+    baseY: table.texel(id, 0).g, curb: THREE.TSL.float(0.14), affine: { sx: 1.0015, sz: 0.9994, ox: 120, oz: -50 } });
+  const patternPosition = frame.position, patternNormal = frame.normal;
+  const sourceLightTrim = { night: THREE.TSL.uniform(0), scale: THREE.TSL.uniform(new THREE.Vector3(1, 1, 1)), st34: THREE.TSL.uniform(new THREE.Vector4(0.3, 0, 0, 0)) };
+  const material = createPbrMaterial(THREE as never, { ...CONCRETE, weatherAttr: true, grimeAttr: true, dirtAttr: true }, {
+    ...textures, night: THREE.TSL.float(0) as never, physical: true, parameterNodes: { pbSeed: seed }, attributeNodes, patternPosition, patternNormal, sourceLightTrim, environmentIntensityNode,
+  });
+  const geometry = new THREE.BoxGeometry();
+  geometry.setAttribute('aVdSurface', new THREE.BufferAttribute(new Float32Array(geometry.getAttribute('position').count * 4), 4));
+  geometry.setAttribute('aVdWeather', new THREE.BufferAttribute(new Float32Array(geometry.getAttribute('position').count * 4), 4));
+  const scene = new THREE.Scene();
+  scene.add(new THREE.HemisphereLight(), new THREE.Mesh(geometry, material));
+  const camera = new THREE.PerspectiveCamera(); camera.position.z = 5;
+  renderer.render(scene, camera);
+  assert.ok(record.shaders.some((shader) => shader.includes('textureLoad(') && /@interpolate\(\s*flat\s*\)/.test(shader)));
+  assert.ok(record.textures.some((texture) => texture.format === 'rgba32float'));
+  assert.ok(record.pipelineVertexBuffers.every((pipeline) => pipeline.buffers <= 8));
+  const pipelines = record.renderPipelines;
+  const other = createPbrMaterial(THREE as never, GREEN, {
+    ...textures, night: THREE.TSL.float(0) as never, physical: true, parameterNodes: { pbSeed: seed }, attributeNodes, patternPosition, patternNormal, sourceLightTrim, environmentIntensityNode,
+  });
+  scene.add(new THREE.Mesh(geometry, other));
+  renderer.render(scene, camera);
+  assert.equal(record.renderPipelines, pipelines, 'attribute modes and descriptors share one family pipeline');
+  other.dispose();
+  geometry.dispose(); material.dispose(); table.dispose(); textures.albedo.dispose(); textures.orm.dispose();
+  await renderer.dispose();
 });

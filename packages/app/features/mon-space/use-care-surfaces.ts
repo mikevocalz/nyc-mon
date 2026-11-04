@@ -14,6 +14,10 @@ import { createCareSurfaceSync } from './care-surface-sync.ts';
 import { careSurfacesFromSave } from './phase1-care-surfaces.ts';
 import { clearMonCareSurfaces, publishMonCareSurfaces } from './publish-mon-care';
 import { careConsentAllowed, careOwnershipChanges, careSaveIdentity, careSaveOwnedBy, rememberVerifiedCareOwner, verifyCareSaveRoster } from './care-surface-owner.ts';
+import { createMonLingoSource } from '../voice/mon-lingo-source.ts';
+
+const watchLingo = createMonLingoSource({ baseUrl: AUTH_BASE_URL,
+  headers: Platform.OS === 'web' ? undefined : { origin: APP_ORIGIN }, fetch });
 
 /** Mount once at the app root, so care surfaces keep working outside H-Lynk. */
 export function useCareSurfaces(): void {
@@ -57,7 +61,7 @@ export function useCareSurfaces(): void {
           }
           return null;
         }
-        return careSurfacesFromSave(save, state.activeMonInstanceId, Date.now(), (mon) => monIdentity(mon).name);
+        return careSurfacesFromSave(save, state.activeMonInstanceId, Date.now(), (mon) => monIdentity(mon).name, watchLingo.current());
       },
       publish: publishMonCareSurfaces,
       clear: clearMonCareSurfaces,
@@ -74,10 +78,14 @@ export function useCareSurfaces(): void {
       timer = setTimeout(() => { sync.refresh(); schedule(); }, msToNextMinute(Date.now()));
     };
     const subscription = AppState.addEventListener('change', (next) => {
-      if (next === 'active') { sync.refresh(); schedule(); }
+      if (next === 'active') {
+        sync.refresh(); schedule();
+        void watchLingo.refresh().then(() => { if (live) sync.refresh(); });
+      }
       else if (next === 'background') clearTimeout(timer);
     });
     sync.refresh();
+    void watchLingo.refresh().then(() => { if (live) sync.refresh(); });
     schedule();
     return () => {
       live = false;

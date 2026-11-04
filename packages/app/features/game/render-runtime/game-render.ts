@@ -20,7 +20,7 @@ import { scheduleOnRN, type Synchronizable } from 'react-native-worklets';
 import { advanceNodeFrame, releaseCanvasBuffers, stopInternalLoop } from '@acme/ui/three/internals';
 import type { NativeCanvasContext, ThreeFrame, ThreeScene } from '@acme/ui/three';
 import { bundledCity } from '../city-data.ts';
-import { createCityScene } from '../city-scene.ts';
+import { createCitySceneAsync } from '../city-scene.ts';
 import { createCallerProxyWith } from '../character/caller-proxy.ts';
 import { withFirstFrameSignal, type GameSceneParams } from '../load-game-scene.ts';
 import { bundledSignals } from '../living-city/bundled-signals.ts';
@@ -258,13 +258,18 @@ function disposeSession(s: Session) {
   };
   const renderer = s.renderer;
   if (renderer?.initialized) cleanup('dispose animation', () => stopInternalLoop(renderer));
-  cleanup('dispose scene', () => s.built?.dispose?.());
-  if (renderer) {
+  let sceneDrain: void | Promise<void> = undefined;
+  try { sceneDrain=s.built?.dispose?.(); }
+  catch(error){emit(s,'error',describeRuntimeError('dispose scene',error));}
+  const releaseRenderer=()=>{
+    if (!renderer) return;
     // three's dispose leaves the canvas target's multisampled colour and
     // depth buffers to a GC on the shared device: about 100 MB at the iPad size.
     cleanup('dispose canvas buffers', () => { releaseCanvasBuffers(renderer); });
     cleanup('dispose renderer', () => renderer.dispose());
-  }
+  };
+  if(sceneDrain)void sceneDrain.catch((error:unknown)=>emit(s,'error',describeRuntimeError('dispose scene',error))).then(releaseRenderer);
+  else releaseRenderer();
   s.built = null;
   s.renderer = null;
   if (active === s) active = null;
@@ -332,7 +337,7 @@ export function startGameRender(args: GameRenderArgs): void {
   const ready = shared && WORLD_DEVICE_PROBE && WORLD_DEVICE_PROBE !== 'pipecache'
     ? renderer.init().then(() => runRendererProbe(s, renderer, shared))
     : renderer.init();
-  ready.then(() => {
+  ready.then(async () => {
     if (s.disposed) {
       // Unmounted while init ran: the dispose above came before init made its
       // frame loop and canvas buffers, so release what init built now.
@@ -402,7 +407,7 @@ export function startGameRender(args: GameRenderArgs): void {
       },
     };
     const setup = withFirstFrameSignal(
-      createCityScene,
+      createCitySceneAsync,
       (stage, fraction) => {
         if (fraction === undefined) pipecache?.mark(stage);
         emit(s, 'stage', formatRuntimeStage(stage, fraction));
@@ -417,7 +422,9 @@ export function startGameRender(args: GameRenderArgs): void {
       schedule(s);
     };
     s.params = params;
-    s.built = setup({ THREE, renderer, backend: 'webgpu', invalidate }, params);
+    const built = await setup({ THREE, renderer, backend: 'webgpu', invalidate }, params);
+    if (s.disposed) { await built.dispose?.(); return; }
+    s.built = built;
     trace(s, 'scene built');
     emit(s, 'backend', 'webgpu');
     invalidate();

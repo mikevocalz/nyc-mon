@@ -29,7 +29,40 @@ const config: ExpoConfig & { newArchEnabled: true } = {
     supportsTablet: true,
     // Sign in with Apple entitlement (M03). The App ID needs the capability too.
     usesAppleSignIn: true,
+    privacyManifests: {
+      "NSPrivacyAccessedAPITypes": [
+            {
+                  "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+                  "NSPrivacyAccessedAPITypeReasons": [
+                        "CA92.1", "1C8F.1"
+                  ]
+            },
+            {
+                  "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryFileTimestamp",
+                  "NSPrivacyAccessedAPITypeReasons": [
+                        "C617.1",
+                                    "3B52.1"
+                  ]
+            },
+            {
+                  "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryDiskSpace",
+                  "NSPrivacyAccessedAPITypeReasons": [
+                        "E174.1",
+                        "85F4.1"
+                  ]
+            },
+            {
+                  "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategorySystemBootTime",
+                  "NSPrivacyAccessedAPITypeReasons": [
+                        "35F9.1"
+                  ]
+            }
+      ],
+      "NSPrivacyCollectedDataTypes": [],
+      "NSPrivacyTracking": false
+},
     infoPlist: {
+      RCTNewArchEnabled: true,
       // Profiles the app handles. Every supported pad (Xbox, DualShock 4, DualSense,
       // Switch Pro, Joy-Con pair, MFi) presents ExtendedGamepad; DirectionalGamepad
       // covers d-pad-only MFi remotes. No MicroGamepad: the Siri Remote is not a game controller here.
@@ -56,6 +89,7 @@ const config: ExpoConfig & { newArchEnabled: true } = {
     favicon: './assets/images/favicon.png',
   },
   plugins: [
+    './plugins/with-game-runtime-heap',
     // First in the list so it runs after expo-horizon-core, whose manifest
     // plugin rebuilds `uses-feature` (docs/implementation/hardware-input.md §5).
     './plugins/with-optional-gamepad',
@@ -64,6 +98,7 @@ const config: ExpoConfig & { newArchEnabled: true } = {
     // The Mon keychain: a WidgetKit extension plus the App Group it shares with
     // the app (canon Decision #36; targets/keychain-widget, modules/keychain-widget).
     './plugins/with-keychain-widget',
+    './plugins/with-mon-watch',
     'expo-router',
     // Quest and PICO run Android 12+; Skia v3 (Graphite) needs 26+, and Meta's
     // layout library and react-native-webgpu's AHardwareBuffer use need 29.

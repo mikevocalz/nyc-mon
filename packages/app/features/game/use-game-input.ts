@@ -43,6 +43,7 @@ import {
 } from '@acme/ui/game-controls/hardware';
 import { commandToAction } from './camera-input.ts';
 import { RELEASED_CONTROLS, NOTHING_TO_INTERACT, stepGameFrame, type CallerControls } from './character/caller-controller.ts';
+import { subscribeResidentCollision } from './resident-collision.ts';
 import { chaseRef, cycleZoom, frameWake, jump, placeCaller, recentre, resetViewTurns, streetAxes, worldQueries } from './character/caller-runtime.ts';
 import { callerStore } from './character/caller-store.ts';
 import type { CityDataset } from './city-dataset.ts';
@@ -197,6 +198,7 @@ export function useGameInput(options: GameInputOptions): GameInput {
     };
     // A drag or twist ending outside the loop wakes it, so the view settles onto the block.
     frameWake.current = startLoop;
+    const unsubscribeCollision = subscribeResidentCollision(startLoop);
 
     // Gameplay input turning on is the hand-over: put the Caller where the camera looks.
     // A null placement (nothing walkable in reach of the look-at) leaves the
@@ -324,6 +326,7 @@ export function useGameInput(options: GameInputOptions): GameInput {
       sessionSubscription();
       if (placementTimer) clearTimeout(placementTimer);
       stopLoop();
+      unsubscribeCollision();
       frameWake.current = null;
       resetViewTurns();
       for (const button of [...repeats.keys()]) clearRepeat(button);

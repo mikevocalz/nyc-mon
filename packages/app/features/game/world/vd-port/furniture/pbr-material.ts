@@ -27,7 +27,9 @@
 //     occlusion on the indirect and direct light, both in a PhysicalLightingModel subclass at the points three's GLSL
 //     chunks put them (lights_fragment_end, aomap_fragment).
 //
-// Carried in the descriptor, not applied (lane C's rule, furniture/materials.ts header):
+// Furniture defaults carry these descriptor fields without applying them (lane C's rule,
+// furniture/materials.ts header). Authored building callers explicitly opt into sourceLightTrim;
+// that mode restores the original facade divisor, LT/ST34, and dark-paint ST34 exemption.
 //   * applyLightTrim (world/materials.js L292): pk and lk pass trim STREET_CAL, vk the default 1. It calibrates against
 //     Valdrada's own sun and its trimmed ground; nyc-mon's ground and buildings are untrimmed, so props trimmed alone
 //     would sit at ~0.58 of the pavement. With it go its ST34 specular trim and pbrLib's ST34 exemption for dark paint
@@ -45,8 +47,8 @@
 //   * the material's own roughness and metalness (pkMat raises metalness): pbrLib's shader overwrites roughnessFactor and
 //     metalnessFactor, so they never reached a pixel in Valdrada either. envMapIntensity is set: three uses it when the
 //     material has its own envMap (pkEnvSync / lkEnvSync give metals the scene's environment), as Valdrada's three did.
-// Not ported: the per-vertex attributes (aGrime, aWeather; opts.grimeAttr, opts.weatherAttr): no pk, lk or vk material
-// in the square sets them, and createPbrMaterial throws on a descriptor that does.
+// Per-vertex aGrime/aWeather are supplied explicitly through attributeNodes for building families;
+// furniture keeps its existing uniform-only path. Missing required attribute inputs are rejected.
 //
 // Texture channels (data/pbr-sets.ts): albedo RGB + the normal's X in A; ORM R AO, G roughness, B the metalness or the
 // ORM alpha (height or paint mask) per set, A the normal's Y. The normal's Z is rebuilt. Rows are bottom-up, so pbrLib's
@@ -55,8 +57,10 @@ import type { Three } from '@acme/ui/three';
 import type { Node } from 'three/webgpu';
 import { VD_PBR_BIN, VD_PBR_LAYER_SIZE, VD_PBR_LAYERS, VD_PBR_SETS } from './data/pbr-sets.ts';
 import { worldPatternPosition } from '../../render-space.ts';
+import { applySourceSpecularTrim, sourceDiffuseTrim, type SourceLightTrim } from '../blocks/source-light-trim.ts';
 
 type DataArrayTexture = InstanceType<Three['DataArrayTexture']>;
+type PbrTexture = DataArrayTexture | InstanceType<Three['DataTexture']> | InstanceType<Three['CompressedTexture']> | InstanceType<Three['CompressedArrayTexture']>;
 type StdMat = InstanceType<Three['MeshStandardNodeMaterial']>;
 type V2 = readonly [number, number];
 type V3 = readonly [number, number, number];
@@ -71,7 +75,7 @@ export interface PbrDescriptor {
   envMapIntensity: number;
   trim?: number | readonly number[] | null;
   paint: boolean; over: boolean; street: boolean; gum: boolean; city: boolean;
-  grimeAttr?: boolean; weatherAttr?: boolean;
+  grimeAttr?: boolean; weatherAttr?: boolean; dirtAttr?: boolean;
   pbSize: V2; pbRatio: V3; pbSeed: number; pbDirt: number; pbBaseY: number; pbTopY: number; pbPaint: V3;
   pbUnit: V2; pbBl: V3; pbRot: V4; pbWorld: number; pbChips: number; pbRefL: number; pbScan: V4; pbSubK: number;
   pbOver: V3; pbCavK: number; pbGrimeC: V3; pbGlazed: number; pbRS: V3; pbRough: number; pbMetal: V2; pbNrmK: number;
@@ -84,10 +88,34 @@ export interface PbrEnv {
   night: Node<'float'>;
   /** Colours in the linear working space (the physical stack) rather than display values (the direct path). */
   physical: boolean;
-  albedo: DataArrayTexture;
-  orm: DataArrayTexture;
+  albedo: PbrTexture;
+  orm: PbrTexture;
   /** The street's height under the fragment (pbrLib's pbGy0 from the city AO bake); 0 when not given. */
   groundY?: Node<'float'> | number;
+  /** Reconstruct the authored source frame for transformed building cells; defaults to scene-world for furniture. */
+  patternPosition?: Node<'vec3'>;
+  patternNormal?: Node<'vec3'>;
+  /** Authored building calibration; omitted by furniture, which keeps the established lane-C policy above. */
+  sourceLightTrim?: SourceLightTrim;
+  /** An authored building bank's explicitly baked set layout; the furniture bank keeps its pinned nine-set lookup. */
+  setLayout?: { layer: number; b: 'metal' | 'alpha'; metal?: number; alphaConst?: number };
+  environmentIntensityNode?: Node<'float'>;
+  /** Original diffuse material/vertex/instance factor, before the PBR albedo and trim. */
+  diffuseFactorNode?: Node<'vec3'>;
+  /** Original unmodified KTX channels for authored buildings (legacy furniture keeps its packed arrays). */
+  sourceSample?: (input: { uv: Node<'vec2'>; dx: Node<'vec2'>; dy: Node<'vec2'>; layer: Node<'float'> }) => {
+    albedo: Node<'vec4'>; orm: Node<'vec4'>; normal: Node<'vec3'>;
+  };
+  /** Shared family graphs may read these constants from a material-ID table instead of per-material uniforms. */
+  parameterNodes?: Readonly<Record<string, Node>>;
+  /** Source aWeather is flat (seed/base/top/dirt); source aGrime is smoothly interpolated. */
+  attributeNodes?: {
+    weather: Node<'vec4'>;
+    grime: Node<'float'>;
+    weatherEnabled?: Node<'float'>;
+    grimeEnabled?: Node<'float'>;
+    dirtEnabled?: Node<'float'>;
+  };
 }
 
 /** The two arrays from the .bin payloads (assets/pbr-albedo.bin, assets/pbr-orm.bin). */
@@ -156,11 +184,25 @@ interface LightingContext {
   reflectedLight: { directDiffuse: N; indirectDiffuse: N; indirectSpecular: N };
 }
 
+function textureDepth(image: unknown): number {
+  if (!image || typeof image !== 'object') throw new Error('PBR texture has no dimension metadata');
+  if (!('depth' in image)) return 1;
+  const depth = image.depth;
+  if (typeof depth !== 'number' || !Number.isInteger(depth) || depth < 1) throw new Error('Invalid PBR texture array depth');
+  return depth;
+}
+
 /** pbrLib's surface for one material, from its descriptor. Every material built here compiles to the same shader. */
 export function createPbrMaterial(THREE: Three, desc: PbrDescriptor, env: PbrEnv): StdMat {
-  if (desc.grimeAttr || desc.weatherAttr) throw new Error(`pbr:${desc.name}: the aGrime / aWeather attributes are not ported`);
-  const S = VD_PBR_SETS.find((s) => s.set === desc.set);
+  if ((desc.grimeAttr || desc.weatherAttr) && !env.attributeNodes) throw new Error(`pbr:${desc.name}: required aGrime / aWeather attribute inputs are missing`);
+  const S = env.setLayout ?? VD_PBR_SETS.find((s) => s.set === desc.set);
   if (!S) throw new Error(`pbr:${desc.name}: set ${desc.set} is not baked (data/pbr-sets.ts)`);
+  const albedoDepth = textureDepth(env.albedo.image);
+  const ormDepth = textureDepth(env.orm.image);
+  if (env.setLayout && (!Number.isInteger(S.layer) || S.layer < 0 || S.layer >= albedoDepth || S.layer >= ormDepth)) {
+    throw new Error(`pbr:${desc.name}: authored texture layer ${S.layer} is outside its resident bank`);
+  }
+  if (!env.sourceSample && (!('isDataArrayTexture' in env.albedo) || !('isDataArrayTexture' in env.orm))) throw new Error(`pbr:${desc.name}: packed furniture textures must be array textures`);
   const T = THREE.TSL as unknown as L;
   const u = (v: number | readonly number[]) => T.uniform(typeof v === 'number' ? v
     : v.length === 2 ? new THREE.Vector2(v[0], v[1]) : v.length === 3 ? new THREE.Vector3(v[0], v[1], v[2]) : new THREE.Vector4(v[0], v[1], v[2], v[3]));
@@ -177,7 +219,27 @@ export function createPbrMaterial(THREE: Three, desc: PbrDescriptor, env: PbrEnv
     pbRough: u(desc.pbRough), pbMetal: u(desc.pbMetal), pbNrmK: u(desc.pbNrmK), pbFac: u(desc.pbFac),
     groundY: typeof env.groundY === 'object' ? (env.groundY as unknown as N) : u(env.groundY ?? 0),
   };
-  const sd = U.pbSeed;
+  if (env.parameterNodes) {
+    for (const [name, value] of Object.entries(env.parameterNodes)) {
+      if (!Object.hasOwn(U, name)) throw new Error(`pbr:${desc.name}: unknown parameter node ${name}`);
+      U[name as keyof typeof U] = value as unknown as N;
+    }
+  }
+  let sd = U.pbSeed, baseY = U.pbBaseY, topY = U.pbTopY, dirt = U.pbDirt;
+  let grime: N | null = null;
+  if (env.attributeNodes) {
+    const attrs = env.attributeNodes;
+    const weather = attrs.weather as unknown as N;
+    const weatherOn = (attrs.weatherEnabled as unknown as N | undefined) ?? T.float(on(desc.weatherAttr === true));
+    const dirtOn = (attrs.dirtEnabled as unknown as N | undefined) ?? T.float(on(desc.dirtAttr === true));
+    const grimeOn = (attrs.grimeEnabled as unknown as N | undefined) ?? T.float(on(desc.grimeAttr === true));
+    sd = sd.add(weather.x.mul(weatherOn));
+    baseY = T.mix(baseY, weather.y, weatherOn);
+    topY = T.mix(topY, weather.z, weatherOn);
+    // pbrLib's negative weather.w sentinel retains the material's own dirt.
+    dirt = T.mix(dirt, weather.w, weatherOn.mul(dirtOn).mul(T.step(0, weather.w)));
+    grime = T.clamp(attrs.grime as unknown as N, 0, 1).mul(grimeOn);
+  }
 
   // ---- NOISE_GLSL
   // (as WGSL functions: inlined, the noise trees made a 190 kB fragment shader)
@@ -207,8 +269,8 @@ export function createPbrMaterial(THREE: Three, desc: PbrDescriptor, env: PbrEnv
   const sel = (c: N, a: A, b: A) => T.mix(b, a, c);   // c in {0, 1}
 
   // ---- the mapping
-  const W = worldPatternPosition(THREE) as unknown as N;
-  const wn = T.normalize(T.normalWorldGeometry);
+  const W = (env.patternPosition ?? worldPatternPosition(THREE)) as unknown as N;
+  const wn = T.normalize((env.patternNormal as unknown as N | undefined) ?? T.normalWorldGeometry);
   const tW = T.normalize(T.vec2(wn.z, wn.x.negate()));
   const mWorld = sel(gt(T.abs(wn.y), 0.7), T.vec2(W.x, W.z.negate()), T.vec2(T.dot(W.xz, tW), W.y));
   const m0 = sel(on5(U.pbWorld), mWorld, T.uv());
@@ -226,6 +288,14 @@ export function createPbrMaterial(THREE: Three, desc: PbrDescriptor, env: PbrEnv
   };
   const tap = (o: N) => {
     const q = st.add(o);
+    if (env.sourceSample) {
+      const sampled = env.sourceSample({ uv: q as unknown as Node<'vec2'>,
+        dx: T.dFdx(st) as unknown as Node<'vec2'>, dy: T.dFdy(st) as unknown as Node<'vec2'>,
+        layer: U.layer as unknown as Node<'float'> });
+      const a = sampled.albedo as unknown as N, r = sampled.orm as unknown as N;
+      return { alb: a.rgb, ao: r.r, rough: r.g, metal: r.b, alpha: r.a,
+        n: (sampled.normal as unknown as N).mul(2).sub(1) };
+    }
     const at = T.vec2(q.x, q.y.negate());
     const a = T.texture(env.albedo, at).depth(U.layer).grad(gx, gy);
     const r = T.texture(env.orm, at).depth(U.layer).grad(gx, gy);
@@ -271,8 +341,8 @@ export function createPbrMaterial(THREE: Three, desc: PbrDescriptor, env: PbrEnv
     alb = T.mix(alb, alb.mul(T.vec3(1.03, 1.0, 0.96)), T.clamp(pbF(wp.xz.mul(0.09).add(wp.y.mul(0.05))).sub(0.4), 0, 1).mul(0.6));
   }
   // the street's height here (no baseY, not a street surface: the city AO bake's height in Valdrada, groundY here)
-  const gy0 = sel(T.float(1).sub(on5(U.street)).mul(T.float(1).sub(T.step(-9000, U.pbBaseY))), U.groundY, U.pbBaseY);
-  const dirtOn = gt(U.pbDirt, 0);
+  const gy0 = sel(T.float(1).sub(on5(U.street)).mul(T.float(1).sub(T.step(-9000, baseY))), U.groundY, baseY);
+  const dirtOn = gt(dirt, 0);
   // weathering of walls, roofs, paint and metal
   const gWall = (() => {
     const h = W.y.sub(gy0);
@@ -283,9 +353,9 @@ export function createPbrMaterial(THREE: Three, desc: PbrDescriptor, env: PbrEnv
     const sp = T.float(1).sub(T.smoothstep(0.05, 0.62, h.add(nz.sub(0.5).mul(0.3))));
     const bs = T.float(1).sub(T.smoothstep(0.4, 2.6, h.add(nz.sub(0.5).mul(0.6))));
     const sk = pbN(T.vec2(uw.mul(2.6).add(sd.mul(5.3)), h.mul(0.11))).mul(0.65).add(pbN(T.vec2(uw.mul(7.9).sub(sd), h.mul(0.35))).mul(0.35));
-    const streak = T.smoothstep(0.56, 0.86, sk).mul(pbN(T.vec2(uw.mul(0.7), h.mul(0.05).add(sd))).mul(0.45).add(0.55))
-      .mul(T.float(1).sub(T.abs(up)));
-    const topY = U.pbTopY;
+    let streak = T.smoothstep(0.56, 0.86, sk).mul(pbN(T.vec2(uw.mul(0.7), h.mul(0.05).add(sd))).mul(0.45).add(0.55));
+    if (grime) streak = T.max(streak, grime.mul(T.smoothstep(0.35, 0.8, sk).mul(0.55).add(0.45)));
+    streak = streak.mul(T.float(1).sub(T.abs(up)));
     const soot = T.smoothstep(topY.sub(3.5), topY.sub(0.25), W.y.add(nz.sub(0.5).mul(1.2))).mul(T.step(W.y, topY.add(0.5)));
     const ledge = T.smoothstep(0.55, 0.9, up).mul(0.55), soff = T.smoothstep(0.55, 0.9, up.negate()).mul(0.35);
     const cav = T.mix(0.5, T.float(1).sub(oA), U.pbCavK);
@@ -293,11 +363,11 @@ export function createPbrMaterial(THREE: Three, desc: PbrDescriptor, env: PbrEnv
       .mul(pbN(T.vec2(uw.mul(3.1), h.mul(2.3)).sub(sd)).mul(0.45).add(0.55));
     // (pt * 0.9: pbrLib's PBR_SOOT soot patches, on by default)
     const g = sp.mul(0.55).add(bs.mul(0.18)).add(streak.mul(0.30)).add(soot.mul(0.28)).add(ledge).add(soff).add(cav.mul(0.14)).add(pt.mul(0.9))
-      .mul(U.pbDirt.mul(pbH12(T.vec2(sd, 7.7)).mul(0.4).add(0.8)));
+      .mul(dirt.mul(pbH12(T.vec2(sd, 7.7)).mul(0.4).add(0.8)));
     return T.clamp(g, 0, 0.85);
   })();
   // street surfaces: oil and wear blotches, chewing-gum spots
-  const gStreet = T.smoothstep(0.55, 0.85, pbF(W.xz.mul(0.35).add(sd.mul(1.3)))).mul(0.35).mul(U.pbDirt);
+  const gStreet = T.smoothstep(0.55, 0.85, pbF(W.xz.mul(0.35).add(sd.mul(1.3)))).mul(0.35).mul(dirt);
   const spot = (() => {
     const gc = W.xz.div(0.23);
     const ci = T.floor(gc), cf = T.fract(gc);
@@ -320,12 +390,15 @@ export function createPbrMaterial(THREE: Three, desc: PbrDescriptor, env: PbrEnv
   // (a gum spot is smoother)
   const oG = T.mix(oG0, 0.55, spot.s);
   // the facades' value curve, as its net value (the header: its / mix(0.30, 0.88, night) undoes the trim not applied)
+  let darkPaintLuminance = T.float(1);
   {
     const a0 = T.max(alb, T.vec3(0));
+    darkPaintLuminance = sel(on5(U.pbFac.x), lum(a0), 1);
     const cv0 = T.pow(a0, T.vec3(1.22)).mul(0.88);
     // paint and metal finishes (pbFac.y): the curve is not carried into the darks
     const cv = sel(on5(U.pbFac.y), T.mix(a0.mul(0.531), cv0, T.step(T.vec3(0.1), a0)), cv0);
-    alb = sel(on5(U.pbFac.x), cv, alb);
+    const calibrated = env.sourceLightTrim ? cv.div(T.mix(0.30, 0.88, env.sourceLightTrim.night as unknown as N)) : cv;
+    alb = sel(on5(U.pbFac.x), calibrated, alb);
   }
 
   // ---- roughness, metalness, the normal
@@ -352,9 +425,11 @@ export function createPbrMaterial(THREE: Three, desc: PbrDescriptor, env: PbrEnv
   // ---- the material
   const material = new THREE.MeshStandardNodeMaterial({ side: desc.side as never });
   material.name = 'pbr:' + desc.name;
-  material.envMapIntensity = desc.envMapIntensity;
+  material.envMapIntensity = env.environmentIntensityNode ? 1 : desc.envMapIntensity;
   const shade = (rgb: N) => (env.physical ? rgb : T.sRGBTransferOETF(T.max(rgb, T.vec3(0))));
-  material.colorNode = T.vec4(shade(alb), 1) as unknown as Node<'vec4'>;
+  let diffuse = env.diffuseFactorNode ? alb.mul(env.diffuseFactorNode as unknown as N) : alb;
+  if (env.sourceLightTrim) diffuse = diffuse.mul(sourceDiffuseTrim(THREE, env.sourceLightTrim) as unknown as N);
+  material.colorNode = T.vec4(shade(diffuse), 1) as unknown as Node<'vec4'>;
   material.roughnessNode = T.clamp(rr, 0.04, 1) as unknown as Node<'float'>;
   material.metalnessNode = metalness as unknown as Node<'float'>;
   material.normalNode = normal as unknown as Node<'vec3'>;
@@ -371,8 +446,29 @@ export function createPbrMaterial(THREE: Three, desc: PbrDescriptor, env: PbrEnv
   };
   const Base = THREE.PhysicalLightingModel;
   class PbrLightingModel extends Base {
+    override start(builder: Parameters<InstanceType<typeof Base>['start']>[0]) {
+      if (env.sourceLightTrim) {
+        applySourceSpecularTrim(THREE, env.sourceLightTrim);
+        // pbrLib AR34 b5 restores dark paint's sheen after applyLightTrim's ST34.
+        const source = env.sourceLightTrim;
+        const night = source.night as unknown as N, st34 = source.st34 as unknown as N;
+        const factor = T.mix(T.mix(st34.x, 1, night), 1, T.float(1).sub(T.smoothstep(0.12, 0.28, T.roughness)));
+        const restore = T.mix(1, T.float(1).div(T.max(factor, 0.05)), T.float(1).sub(T.smoothstep(0.06, 0.12, darkPaintLuminance)));
+        const enabled = on5(U.pbFac.z).mul(on5(U.city));
+        const gain = T.mix(1, restore, enabled);
+        const nodes = THREE.TSL;
+        nodes.specularColor.assign(nodes.specularColor.mul(gain as unknown as Node<'float'>));
+        nodes.specularF90.assign(nodes.min(nodes.specularF90.mul(gain as unknown as Node<'float'>), 1));
+        nodes.specularColorBlended.assign(nodes.mix(nodes.specularColor, nodes.diffuseColor.rgb, nodes.metalness));
+      }
+      super.start(builder);
+    }
     override indirect(builder: Parameters<InstanceType<typeof Base>['indirect']>[0]) {
       const ctx = builder.context as unknown as LightingContext;
+      if (env.environmentIntensityNode) {
+        ctx.radiance.mulAssign(env.environmentIntensityNode as unknown as N);
+        (builder.context as unknown as { iblIrradiance: N }).iblIrradiance.mulAssign(env.environmentIntensityNode as unknown as N);
+      }
       // CITY_GLSL at lights_fragment_end: the environment's radiance along three's own lobe direction, the lobe's share
       // under the street canyon's skyline taken by the city
       const r = T.roughness;

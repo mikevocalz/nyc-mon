@@ -1,6 +1,8 @@
-import { useImperativeHandle, useRef, type Ref } from 'react';
+import { useEffect, useImperativeHandle, useRef, type Ref } from 'react';
 import { Canvas, type CanvasRef, type RNCanvasContext } from 'react-native-webgpu';
 import type { AndroidSurfaceType, ThreeSurfaceHandle } from './types';
+import { WORLD_PERF_GPU_TIMESTAMPS } from './gpu-timestamps';
+import { observeSurfacePresentation } from './surface-presentation-probe';
 import type { NativeCanvasContext } from './worklet-host';
 
 /**
@@ -12,11 +14,23 @@ import type { NativeCanvasContext } from './worklet-host';
 export function ThreeSurface({ ref, androidSurfaceType }: { ref?: Ref<ThreeSurfaceHandle>; androidSurfaceType?: AndroidSurfaceType }) {
   const canvasRef = useRef<CanvasRef>(null);
   const contextRef = useRef<RNCanvasContext | null>(null);
+  const probe = useRef<ReturnType<typeof observeSurfacePresentation> | null>(null);
+  useEffect(() => () => { probe.current?.dispose(); probe.current = null; }, []);
   useImperativeHandle(ref, () => ({
     createRenderer: (THREE, { device, rendererParams }) => {
       const context = canvasRef.current?.getContext('webgpu');
       if (!context?.canvas) throw new Error('[ThreeCanvas] react-native-webgpu context is not ready');
+      probe.current?.dispose(); probe.current = null;
       contextRef.current = context;
+      if (WORLD_PERF_GPU_TIMESTAMPS) {
+        try {
+        probe.current = observeSurfacePresentation(context, {
+          nativeSurface: () => canvasRef.current!.getNativeSurface(), now: () => performance.now(),
+          log: sample => console.info('[ThreeCanvas] native surface', sample),
+          onError: error => console.warn('[ThreeCanvas] native surface probe failed.', error),
+        });
+        } catch (error) { console.warn('[ThreeCanvas] native surface probe unavailable.', error); }
+      }
       return new THREE.WebGPURenderer({
         antialias: true,
         // The native canvas is DOM-shaped enough for three; its types are not.
@@ -26,7 +40,14 @@ export function ThreeSurface({ ref, androidSurfaceType }: { ref?: Ref<ThreeSurfa
         ...rendererParams,
       });
     },
-    present: () => contextRef.current?.present(),
+    present: () => {
+      const context = contextRef.current;
+      if (!context) return;
+      // The probe observes the texture the renderer already acquired; it never
+      // calls getCurrentTexture or present itself.
+      probe.current?.presentAttempt();
+      context.present();
+    },
     isReady: () => {
       const canvas = canvasRef.current?.getContext('webgpu')?.canvas as { width?: number; height?: number } | undefined;
       return typeof canvas?.width === 'number' && canvas.width > 0 && typeof canvas.height === 'number' && canvas.height > 0;

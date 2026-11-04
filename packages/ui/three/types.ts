@@ -95,7 +95,8 @@ export interface ThreeScene<P> {
   update?: (frame: ThreeFrame, params: P) => void;
   /** Called when the canvas size changes, before the next update. */
   resize?: (width: number, height: number) => void;
-  dispose?: () => void;
+  /** Stops callbacks immediately; an asynchronous result drains native work before renderer release. */
+  dispose?: () => void | Promise<void>;
 }
 
 /**

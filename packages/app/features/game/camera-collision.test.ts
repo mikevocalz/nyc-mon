@@ -66,7 +66,8 @@ test('building heights and courtyard holes leave genuinely open sightlines alone
   assert.deepEqual(above, expected, 'a raised target and camera clear the low roof');
   const tall = createCameraBlocker([building(2, -2, 6, 2, 8)]);
   const clipped = constrainChaseCameraPose(pose([8, 5, 0], [0, 3, 0]), tall);
-  assert.ok(clipped.position[0] < 2);
+  assert.equal(tall(...clipped.position, CAMERA_CLEARANCE), false);
+  assert.ok(Math.hypot(clipped.position[0], clipped.position[1] - 3, clipped.position[2]) >= 3, 'a tall wall gets a usable alternate render orbit');
   const courtyard = createCameraBlocker([building(-5, -5, 5, 5, 12, [[-2, -2, 2, -2, 2, 2, -2, 2]])]);
   assert.equal(courtyard(0, 1, 0, CAMERA_CLEARANCE), false);
   const inCourtyard = pose([1.5, 2, 0]);

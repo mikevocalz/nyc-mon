@@ -25,7 +25,7 @@ test('late shadow pass and close-up after the release: no released array is read
   assert.ok(frame.releasedArrays > 100, `${frame.releasedArrays} arrays released before the late passes`);
   assert.deepEqual(frame.releasedReads, {}, 'a late pass read a released array');
   assert.ok([...frame.names].some((n) => n.startsWith('living-city:vehicles:sedan:near-vd-')), 'the vd fleet is in the close-up');
-  assert.ok(frame.pipelines.some((p) => p.label.includes('Shadow') || p.label.includes('Depth')), 'the late shadow pass built pipelines');
+  assert.ok(frame.shadowMapAllocated, 'the late shadow pass allocated its real depth target');
   const over = frame.pipelines.filter((p) => p.buffers > MAX_VERTEX_BUFFERS);
   assert.deepEqual(over, [], `pipelines over the iPad's ${MAX_VERTEX_BUFFERS} vertex buffers`);
 });

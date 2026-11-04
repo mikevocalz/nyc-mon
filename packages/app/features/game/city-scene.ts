@@ -1,4 +1,6 @@
-import { finishPreparation, runPreparation } from './scene-preparation.ts';
+import { createSourceTemplateCompiler } from './source-template-compiler.ts';
+import { createSceneBuildProgress } from './scene-build-progress.ts';
+import { awaitPreparationAssets, finishPreparation, runPreparation } from './scene-preparation.ts';
 // The Game world scene: the static Harlem city from world/, the camera that
 // orbits its look-at point, and the actors (the Caller first) that live in
 // it. The canvas draws on demand; while any actor reports motion the scene
@@ -11,7 +13,7 @@ import type { ActorFrame, SceneActor, SceneActorFactory } from './scene-actor.ts
 import { prepareCityWorld } from './world/index.ts';
 import { createKlippShotRig, type KlippCameraShot } from './camera/klipp-shot-bridge.ts';
 import { shadowSafeCasters } from './world/vd-port/shared/shadow-safe.ts';
-import { cityCompilePass, type CompilePass } from './compile-pass.ts';
+import { cityCompilePass, restoreCompileForFrame, type CompilePass } from './compile-pass.ts';
 import { EXPERIMENTAL_WORLD_POST, mountCityPostPipeline, resolvePostOptions } from './post/pipeline.ts';
 import { livingCityAdaptiveBridge } from './living-city/adaptive-bridge.ts';
 import { EXPERIMENTAL_WORLD_RENDER_SCALE, mountRenderScale } from './perf/render-scale.ts';
@@ -44,6 +46,9 @@ import { createFloatingOrigin, updateFloatingOrigin } from './world/floating-ori
 import { setRenderOrigin } from './world/render-space.ts';
 import { CELL } from './world/cells/cell-rules.ts';
 import { cameraPose, type CameraPose } from './city-camera-pose.ts';
+import { residentSourceBlocked, residentCollisionRevision, residentCollisionStats } from './resident-collision.ts';
+import { createSourceHeightFrame } from './world/vd-port/blocks/source-height-frame.ts';
+import { authoredBuildingBlocked } from './world/vd-port/blocks/building-colliders.ts';
 import { CAMERA_CLEARANCE, createCameraBlocker, createChaseCameraConstraint } from './camera-collision.ts';
 
 /** Night-light ranking requires a unit horizontal forward even for quaternion-only or vertical shots. */
@@ -136,12 +141,16 @@ export function createCityScene(context: ThreeContext, initial: CitySceneParams)
 }
 
 /** JS-thread preparation yields completed world phases; render-runtime callers retain createCityScene. */
-export function createCitySceneAsync(context: ThreeContext, initial: CitySceneParams): Promise<ThreeScene<CitySceneParams>> {
-  return runPreparation(prepareCityScene(context, initial), context.signal);
+export async function createCitySceneAsync(context: ThreeContext, initial: CitySceneParams): Promise<ThreeScene<CitySceneParams>> {
+  const prepared = await runPreparation(prepareCityScene(context, initial), context.signal);
+  return awaitPreparationAssets(prepared, context.signal);
 }
 
-function* prepareCityScene(context: ThreeContext, initial: CitySceneParams): Generator<number, ThreeScene<CitySceneParams>, void> {
+type PreparedCityScene = ThreeScene<CitySceneParams> & { ready?: Promise<void>; finishAssets?(): void };
+
+function* prepareCityScene(context: ThreeContext, initial: CitySceneParams): Generator<number, PreparedCityScene, void> {
   const { THREE, invalidate, renderer } = context;
+  const buildProgress = createSceneBuildProgress(initial.onBuildProgress, context.signal);
   // r187 upstreamed the shadow-pass alphaTest bypass (world/shadow-pass-alpha.test.ts pins it).
   if (![initial.camera.x, initial.camera.z, initial.camera.yaw, initial.camera.distance].every(Number.isFinite)) throw new Error('Invalid city camera');
   // The dataset arrives parsed (city-data.ts runs parseCityDataset once per runtime); only check the shape here.
@@ -151,7 +160,9 @@ function* prepareCityScene(context: ThreeContext, initial: CitySceneParams): Gen
   }
   const featureCount = dataset.buildings.length + dataset.roads.length + dataset.areas.length;
   if (featureCount > MAX_SCENE_FEATURES) throw new Error('City scene feature budget exceeded');
-  const constrainCamera = createChaseCameraConstraint(createCameraBlocker(dataset.buildings));
+  const mappedCameraBlocked = createCameraBlocker(dataset.buildings);
+  const constrainCamera = createChaseCameraConstraint((x, y, z, radius) =>
+    mappedCameraBlocked(x, y, z, radius) || authoredBuildingBlocked(x, y, z, radius) || residentSourceBlocked(x, y, z, radius), residentCollisionRevision);
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(50, 1, 0.5, 10_000);
@@ -187,7 +198,9 @@ function* prepareCityScene(context: ThreeContext, initial: CitySceneParams): Gen
   const streamLog = GAME_PERF ? (line: string, data: Record<string, unknown>) => console.info(`${STREAM_LOG} ${line}`, data) : undefined;
   const world = yield* prepareCityWorld(THREE, dataset, {
     sky: initial.sky,
-    ...(initial.onBuildProgress ? { onProgress: initial.onBuildProgress } : {}),
+    ...(renderer ? { hasTextureFeature: (name: string) => renderer.hasFeature(name) } : {}),
+    onProgress: buildProgress.cpu,
+    onAssetProgress: buildProgress.asset,
     ...(bundle ? { glassTier: bundle.glassTier, envWidth: bundle.envWidth } : {}),
     ...(physical?.pbrMaterials ? { pbr: true, carPbr: true, physical: true } : {}),
     // Pooled PointLights only where ClusteredLighting clusters them (physical-rig.ts).
@@ -196,15 +209,28 @@ function* prepareCityScene(context: ThreeContext, initial: CitySceneParams): Gen
       : {}),
     ...(worldStreamEnabled(physical !== null) ? { stream: { preset, log: streamLog, wake: invalidate } } : {}),
   });
-  const owned: (() => void)[] = [() => scene.clear(), () => world.dispose()];
+  const owned: (() => void | Promise<void>)[] = [() => { scene.clear(); }, () => world.dispose()];
   let delivered = false;
   let disposed = false;
+  let sourceCompiler: ReturnType<typeof createSourceTemplateCompiler> | undefined;
+  let disposal: Promise<void> | undefined;
   const disposeScene = () => {
-    if (disposed) return;
+    if (disposed) return disposal;
     disposed = true;
-    for (const dispose of owned.reverse()) {
-      try { dispose(); } catch (error) { console.warn('[city-scene] resource cleanup failed', error); }
-    }
+    buildProgress.dispose();
+    const cleanup = () => {
+      let pending: Promise<void> | undefined;
+      const failed = (error: unknown) => { console.warn('[city-scene] resource cleanup failed', error); };
+      for (const release of owned.reverse()) {
+        if (pending) { pending = pending.then(release).catch(failed); continue; }
+        try { const result = release(); if (result) pending = result.catch(failed); } catch (error) { failed(error); }
+      }
+      return pending;
+    };
+    const drain = sourceCompiler?.dispose();
+    if (drain) { disposal = drain.then(cleanup); return disposal; }
+    const result = cleanup();
+    if (result) { disposal = result; return disposal; }
   };
   try {
     // Klipp owns camera orientation/lens and blends authored shots with the
@@ -242,9 +268,10 @@ function* prepareCityScene(context: ThreeContext, initial: CitySceneParams): Gen
           clusteredMaxLights: physicalTier.clusteredMaxLights,
           preset: initial.preset ?? DEFAULT_PHYSICAL_PRESET,
           shadowInterval: WORLD_SHADOW_INTERVAL,
+          wake: invalidate,
         })
       : null;
-    if (rig) owned.push(() => rig.dispose());
+    if (rig) { owned.push(() => rig.dispose()); world.applySourceLook(rig.sourceLook); }
     if (rig) {
       // The rig's lights and sky replace the world's own, one for one.
       if (rig.sky) world.sky.visible = false;
@@ -256,13 +283,20 @@ function* prepareCityScene(context: ThreeContext, initial: CitySceneParams): Gen
     // L5 "finishing pass": flagged post stack on the renderer — the mount
     // swaps renderer.render for the RenderPipeline's quad path (post/pipeline.ts).
     // Flag OFF mounts nothing and the direct path stays byte-identical.
+    let renderedDelta = 0;
+    const sourceWeatherFrame = {rain:0,snow:0};
+    const sourceHazeFrame = {origin:[0,0,0] as [number,number,number],sourceYOffset:0};
+    const sourceHeightOffset = createSourceHeightFrame();
     const post = renderer && physical?.pipeline
       ? mountCityPostPipeline(THREE, {
           renderer,
           scene,
           camera,
           options: {},
+          wake: invalidate,
+          afterRender: () => { rig?.afterRender(camera, renderedDelta); },
           physical: {
+            ...(rig ? { sourceLook: rig.sourceLook } : {}),
             mrt: physical.mrt,
             ssr: physical.ssr,
             bloom: physical.bloom,
@@ -288,6 +322,7 @@ function* prepareCityScene(context: ThreeContext, initial: CitySceneParams): Gen
           })
         : null;
     if (post) owned.push(() => post.dispose());
+    if (rig && post?.physical) rig.setSourceHazeActive(true);
     if (post) cityCompilePass.set(scene, post.scenePass as unknown as CompilePass);
     // The render-scale controller samples draw pacing from this scene's
     // update clock and steps the drawing buffer through the pixel ratio.
@@ -409,7 +444,7 @@ function* prepareCityScene(context: ThreeContext, initial: CitySceneParams): Gen
     applyReversedDepthOffsets(scene, renderer as { reversedDepthBuffer?: boolean } | null | undefined);
     // After the actors joined, so their instanced meshes are swapped too.
     const storageSwapped = rigModule && renderer && physical?.storage ? rigModule.swapInstanceMatricesToStorage(THREE, renderer, scene) : 0;
-    if (rigModule && renderer && storageSwapped > 0) owned.push(() => rigModule.releaseStorageInstanceMatrices(renderer, scene));
+    if (rigModule && renderer && storageSwapped > 0) owned.push(() => { rigModule.releaseStorageInstanceMatrices(renderer, scene); });
     let probeCleanup: (() => void) | void = undefined;
     if (renderer && isDeviceLaneProbe(WORLD_PROBE)) {
       probeCleanup = deviceLaneProbeHooks[WORLD_PROBE]?.({ THREE, renderer, scene, camera });
@@ -447,10 +482,13 @@ function* prepareCityScene(context: ThreeContext, initial: CitySceneParams): Gen
     const streamCamera = { x: 0, y: 0, z: 0 };
     const nightForward = new THREE.Vector3();
     let lastOriginChanged = true;
+    const cameraProbeDesired = GAME_PERF ? new Float64Array(3) : null;
+    let cameraProbeAt = -Infinity, cameraProbeCount = 0;
 
     function positionCamera(value: CityCamera, cinematicShot: KlippCameraShot | null | undefined, delta: number, reducedMotion: boolean) {
       if (![value.x, value.z, value.yaw, value.distance].every(Number.isFinite)) throw new Error('Invalid city camera');
       cameraPose(value, pose);
+      cameraProbeDesired?.set(pose.position);
       const desiredNear = Math.max(0.1, Math.min(5, pose.distance * 0.02));
       const nearPlaneRadius = desiredNear * Math.hypot(1, Math.tan(camera.fov * Math.PI / 360) * camera.aspect);
       constrainCamera(pose, Math.max(CAMERA_CLEARANCE, nearPlaneRadius));
@@ -481,11 +519,35 @@ function* prepareCityScene(context: ThreeContext, initial: CitySceneParams): Gen
       streamCamera.y = out.position[1];
       streamCamera.z = out.position[2];
       camera.position.set(out.position[0] - ox, out.position[1], out.position[2] - oz);
+      if (GAME_PERF && cameraProbeCount < 120) {
+        const now = performance.now();
+        if (now - cameraProbeAt >= 500) {
+          cameraProbeAt = now; cameraProbeCount++;
+          console.info('[NYC-Mon/camera] render pose', {
+            version: 'resident-triangle-orbit-v3', phase: 'afterSceneUpdate-beforeRenderer', sequence: cameraProbeCount,
+            requested: value, desiredEye: Array.from(cameraProbeDesired!),
+            constrainedEye: [...pose.position], chaseTarget: [...pose.target],
+            finalEye: [...out.position], finalTarget: out.hasLookAtTarget ? [...out.lookAtTarget] : null,
+            finalQuaternion: [...out.quaternion], cameraEye: camera.position.toArray(), cameraQuaternion: camera.quaternion.toArray(),
+            matrixAutoUpdate: camera.matrixAutoUpdate, matrixWorldAutoUpdate: camera.matrixWorldAutoUpdate,
+            matrixWorld: [...camera.matrixWorld.elements], viewMatrix: [...camera.matrixWorldInverse.elements], projectionMatrix: [...camera.projectionMatrix.elements],
+            cameraUuid: camera.uuid,
+            origin: [ox, oz], cinematic: cinematicShot != null,
+            collision: residentCollisionStats(),
+            eyeBlocked: mappedCameraBlocked(out.position[0], out.position[1], out.position[2], CAMERA_CLEARANCE) ||
+              authoredBuildingBlocked(out.position[0], out.position[1], out.position[2], CAMERA_CLEARANCE) ||
+              residentSourceBlocked(out.position[0], out.position[1], out.position[2], CAMERA_CLEARANCE),
+          });
+        }
+      }
       return moving;
     }
     positionCamera(initial.camera, initial.cinematicShot, 0, false);
     // The START set, after every scene pass above (shadow roles, depth offsets) has reached the layer templates.
     camera.updateMatrixWorld();
+    sourceCompiler = createSourceTemplateCompiler(THREE, renderer, scene, camera, post?.scenePass ?? null,
+      () => rig?.sourceProbePreparation ? [rig.sourceProbePreparation] : [], buildProgress.compile);
+    world.setPrepareTemplates(sourceCompiler.prepare);
     world.primeStream(streamCamera, errorScale(), preset.residentRadiusM * STREAM_START_SHARE);
     if (world.stream) cityStreamStats.set(scene, world.stream.stats);
     if (streamLog && world.stream) {
@@ -504,10 +566,26 @@ function* prepareCityScene(context: ThreeContext, initial: CitySceneParams): Gen
     // uploaded; once nothing is pending the check costs nothing.
     const releaser = renderer && RELEASE_UPLOADED ? createUploadedReleaser(world.group) : null;
     const uploaded = renderer && releaser ? backendUploaded(renderer) : null;
-    const prepared: ThreeScene<CitySceneParams> = {
+    const prepared: PreparedCityScene = {
+      ready: Promise.resolve(world.ready).then(async () => {
+        await sourceCompiler?.prepareScene(context.signal ?? new AbortController().signal);
+        // compileAsync has already copied these immutable vertex buffers. Free their CPU
+        // copies before compiling the main pass; texture placeholders do not qualify.
+        if (renderer && RELEASE_UPLOADED) {
+          const preparedGeometry = createUploadedReleaser(world.group, { settleFrames: 1, textures: false });
+          const bytes = preparedGeometry.release(backendUploaded(renderer));
+          streamLog?.('prepared-geometry-released', { bytes });
+        }
+      }),
+      finishAssets: () => {
+        if (world.ready) world.primeStream(streamCamera, errorScale(), preset.residentRadiusM * STREAM_START_SHARE);
+        buildProgress.finish();
+      },
       scene,
       camera,
       update: (frame, params) => {
+        restoreCompileForFrame(scene);
+        sourceCompiler?.beforeFrame();
         if (params.dataset !== initial.dataset) throw new Error('Remount city scene when changing datasets');
         if (releaser && uploaded && releaser.pending > 0) releaser.release(uploaded);
         const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
@@ -574,7 +652,7 @@ function* prepareCityScene(context: ThreeContext, initial: CitySceneParams): Gen
         // After the actors: a chase camera reads the Caller's position in this frame's params.
         const cameraMoving = positionCamera(params.camera, params.cinematicShot, frame.delta, frame.reducedMotion === true);
         // Cells in and out for this camera; while some are still to build or fading, ask for the next frame.
-        if (world.updateStream(streamCamera, errorScale(), now / 1000)) invalidate?.();
+        if (world.updateStream(streamCamera, errorScale(), now / 1000,frame.reducedMotion===true)) invalidate?.();
         if (streamLog && world.stream && now - streamLogAt >= 5000) {
           streamLogAt = now;
           const st = world.stream.stats;
@@ -583,18 +661,30 @@ function* prepareCityScene(context: ThreeContext, initial: CitySceneParams): Gen
             maxBuildMs: +st.maxBuildMs.toFixed(2), pending: st.pending, overBudget: st.overBudget,
           });
         }
+        renderedDelta = frame.delta;
         if (rig) {
+          const precip = world.weather;
+          sourceWeatherFrame.rain=precip?.wet.value ?? 0;sourceWeatherFrame.snow=precip?.snow.value ?? 0;
+          rig.setSourceWeather(sourceWeatherFrame);
+          rig.beforeRender(camera,frame.time,frame.reducedMotion===true,sourceHeightOffset(camera.position.x+origin.cx*CELL,camera.position.z+origin.cz*CELL));
+          world.applySourceLook(rig.sourceLook);
+          post?.physical?.applySourceLook(rig.sourceLook);
+          post?.physical?.updateSourceFrame(frame.time,frame.reducedMotion===true);
+          sourceHazeFrame.origin[0]=origin.cx*CELL;sourceHazeFrame.origin[2]=origin.cz*CELL;
+          sourceHazeFrame.sourceYOffset=sourceHeightOffset(camera.position.x+sourceHazeFrame.origin[0],camera.position.z+sourceHazeFrame.origin[2]);
+          post?.physical?.updateSourceCamera(sourceHazeFrame);
           const out = shots.shot;
           const focusX = out.hasLookAtTarget ? out.lookAtTarget[0] : out.position[0];
           const focusZ = out.hasLookAtTarget ? out.lookAtTarget[2] : out.position[2];
-          rig.update(camera.position.y, focusX - origin.cx * CELL, focusZ - origin.cz * CELL);
+          rig.update(camera.position.y, focusX - origin.cx * CELL, focusZ - origin.cz * CELL,frame.time);
           const preset = params.preset ?? DEFAULT_PHYSICAL_PRESET;
           if (preset !== rig.preset) {
             // The rebake renders PMREM cube faces through renderer.render, which
             // the post mount has pointed at the pipeline; run it on the direct path.
             if (post) post.withDirectRender(() => rig.applyPreset(preset));
             else rig.applyPreset(preset);
-            post?.physical?.applyLook(PHYSICAL_PRESETS[preset].grade);
+            world.applySourceLook(rig.sourceLook);
+            post?.physical?.applySourceLook(rig.sourceLook);
             invalidate?.();
           }
           // Night light follows the camera and the preset's interior glow (world/physical/night-lights.ts).
@@ -607,7 +697,7 @@ function* prepareCityScene(context: ThreeContext, initial: CitySceneParams): Gen
         // live the loop must keep drawing, or the on-demand canvas freezes
         // the weather with the world.
         const precip = world.weather;
-        if (moving || cameraMoving || (precip !== null && Math.max(precip.wet.value, precip.snow.value) > 0.01)) invalidate?.();
+        if (moving || cameraMoving || (rig?.animated && !frame.reducedMotion) || (precip !== null && Math.max(precip.wet.value, precip.snow.value) > 0.01)) invalidate?.();
         if (probeWindow) {
           const end = typeof performance !== 'undefined' ? performance.now() : Date.now();
           probeSample.cpuMs = end - now;
@@ -637,8 +727,10 @@ function* prepareCityScene(context: ThreeContext, initial: CitySceneParams): Gen
       },
       dispose: disposeScene,
     };
-    initial.onBuildProgress?.(0.99);
+    buildProgress.beginAssets();
     yield 0.99;
+    // Observe immediately; callers still receive the original rejecting prerequisite.
+    void prepared.ready?.catch(() => {});
     delivered = true;
     return prepared;
   } finally {

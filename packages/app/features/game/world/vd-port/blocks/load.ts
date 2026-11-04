@@ -1,9 +1,16 @@
+import { preloadShellCollisionPack } from './shell-collision-assets.ts';
+import type { PrecomputedShellCollisionPack } from './shell-collision-pack.ts';
+import type { SourceBlockAssets } from './surface-part.ts';
+
 // The block packs' bytes, read once while the game scene loads (load-game-scene.ts) and kept compressed: the shell
 // (4.7 MB) decodes when the world is built, each near cell (16.4 MB together; 9.2 MB for the lite level) when the
 // streamer first builds it.
 // buildCityWorld is synchronous, so the bytes must be here before it runs; without them lane A draws nothing and says so.
 
 export interface VdBlockBytes {
+  shellCollision?: PrecomputedShellCollisionPack;
+  /** Authored VDN3 cells and their required material bank, when supplied by the generated source-asset loader. */
+  surface?: SourceBlockAssets;
   shell: Uint8Array;
   /** The near level's cells, of `level` (perf/tier-presets.ts vdPort.blocksNear.level: 'lite' on the iPad and phone). */
   near: ReadonlyMap<string, Uint8Array>;
@@ -35,9 +42,20 @@ export interface VdBlockBytes {
 
 let bytes: VdBlockBytes | null = null;
 let pending: Promise<VdBlockBytes | null> | null = null;
+let sourceAssets: SourceBlockAssets | null = null;
+
+/** CPU metadata only, installed by the generated asset entry before scene creation; every scene owns its GPU bank. */
+export function setVdBlockSurfaceAssets(value: SourceBlockAssets | null): void {
+  sourceAssets = value;
+  if (bytes) {
+    if (value) bytes.surface = value;
+    else delete bytes.surface;
+  }
+}
 
 /** The preloaded bytes, or null when preloadVdBlocks has not finished (or failed). */
 export function vdBlockBytes(): VdBlockBytes | null {
+  if (bytes && sourceAssets && bytes.surface !== sourceAssets) bytes.surface = sourceAssets;
   return bytes;
 }
 
@@ -234,8 +252,20 @@ export function preloadVdBlocks(): Promise<VdBlockBytes | null> {
       } catch (cause) {
         console.warn('[vd-port] the ring-10 block packs did not load; its cells stay with the cell source', cause);
       }
+      const shellBytes = new Uint8Array(shell!);
+      const collisionSources: {ring:number;bytes:Uint8Array}[] = [{ring:0,bytes:shellBytes}];
+      for (const [index,ring] of [ring1,ring2,ring3,ring4,ring5,ring6,ring7,ring8,ring9,ring10].entries()) {
+        if(ring)collisionSources.push({ring:index+1,bytes:ring.shell});
+      }
+      const shellCollision = await preloadShellCollisionPack(collisionSources);
+      if(!sourceAssets){
+        const generated=await import('./data-source/assets.ts');
+        sourceAssets=generated.createVdBlockSurfaceAssets(fetchAssetBytes);
+      }
       bytes = {
-        shell: new Uint8Array(shell!),
+        surface: sourceAssets,
+        shellCollision,
+        shell: shellBytes,
         near: new Map(entries.map(([key], i) => [key, near[i]! instanceof Uint8Array ? near[i]! as Uint8Array : new Uint8Array(near[i]!)])),
         level,
         ring1,
@@ -251,8 +281,8 @@ export function preloadVdBlocks(): Promise<VdBlockBytes | null> {
       };
       return bytes;
     } catch (cause) {
-      console.warn('[vd-port] the block packs did not load; the bundled tile keeps its own buildings', cause);
-      return null;
+      console.error('[vd-port] authored block assets failed to load', cause);
+      throw cause;
     } finally {
       pending = null;
     }

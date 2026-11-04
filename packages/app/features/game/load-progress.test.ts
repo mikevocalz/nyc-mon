@@ -258,3 +258,73 @@ test('fine-grained geometry checkpoints emit at most one timing beacon per build
   await Promise.resolve();
   built.dispose?.();
 });
+
+test('disposing an active initial compile drains it and suppresses late frame/invalidate callbacks',async()=>{
+ const {withFirstFrameSignal}=await import('./load-game-scene.ts');
+ let finish!:()=>void,disposed=0,invalidated=0,first=0,reports=0;
+ let progress!:(event:{loaded:number;total:number})=>void;
+ const setup=withFirstFrameSignal(()=>({scene:{traverse() {}} as never,camera:{} as never,dispose(){disposed++;}}),()=>{reports++;});
+ const built=setup({renderer:{compileAsync:(_s:unknown,_c:unknown,_t:unknown,callback:typeof progress)=>{progress=callback;return new Promise<void>(resolve=>{finish=resolve;});}},invalidate(){invalidated++;}} as never,{} as never);
+ const drain=built.dispose?.();assert.ok(drain instanceof Promise);assert.equal(disposed,0);
+ const priorReports=reports;progress({loaded:1,total:1});assert.equal(reports,priorReports);
+ built.update?.({} as never,{onFirstFrame(){first++;}} as never);finish();await drain;
+ assert.equal(disposed,1);assert.equal(invalidated,0);assert.equal(first,0);
+ await built.dispose?.();assert.equal(disposed,1);
+});
+
+test('cancelled setup retains its asynchronous scene cleanup barrier before rejecting',async()=>{
+ const {withFirstFrameSignal}=await import('./load-game-scene.ts');const abort=new AbortController();
+ let finish!:(value:unknown)=>void,release!:()=>void,closed=false,settled=false;
+ const cleanup=new Promise<void>(resolve=>{release=resolve;});
+ const setup=withFirstFrameSignal(()=>new Promise<never>(resolve=>{finish=resolve as (value:unknown)=>void;}));
+ const pending=Promise.resolve(setup({signal:abort.signal,renderer:{compileAsync(){assert.fail('cancelled compile');}},invalidate(){assert.fail('late invalidate');}} as never,{} as never));
+ void pending.catch(()=>{settled=true;});abort.abort();finish({dispose(){closed=true;return cleanup;}});
+ await Promise.resolve();await Promise.resolve();assert.equal(closed,true);assert.equal(settled,false);
+ release();await assert.rejects(pending,{name:'AbortError'});
+});
+
+test('real build fractions keep the 20-second watchdog alive even while rounded UI remains at 37%; duplicates do not', async t => {
+  const { withFirstFrameSignal } = await import('./load-game-scene.ts');
+  const { awaitWorldReady, WorldNotReadyError } = await import('./lobby/await-world-ready.ts');
+  let now = 0, id = 0;
+  t.mock.method(Date, 'now', () => now);
+  const timers = new Map<number, { at: number; fn(): void }>();
+  const fake = { setTimeout(fn: () => void, ms: number) { const key = ++id; timers.set(key, { at: now + ms, fn }); return key; },
+    clearTimeout(key: unknown) { timers.delete(key as number); } };
+  const advance = (ms: number) => { now += ms; for (const [key, timer] of [...timers]) if (timer.at <= now) { timers.delete(key); timer.fn(); } };
+  let emit!: (f: number) => void, finish!: () => void;
+  const setup = withFirstFrameSignal((_context, params) => {
+    emit = params.onBuildProgress!;
+    return new Promise<import('@acme/ui/three').ThreeScene<import('./city-scene.ts').CitySceneParams>>(resolve => {
+      finish = () => resolve({ scene: { traverse() {} }, camera: {} } as never);
+    });
+  }, gameScreenActions.loadStage, undefined, null);
+  const prepared = setup({ invalidate() {}, renderer: { compileAsync: () => Promise.resolve() } } as never, {} as never);
+  gameScreenActions.resetForMount(); emit(0.9);
+  const wait = awaitWorldReady(gameScreenStore, 20_000, fake, null, () => now);
+  for (const fraction of [0.9001, 0.9002, 0.9003]) {
+    advance(19_000); emit(fraction);
+    assert.equal(Math.round(gameScreenStore.getState().loadProgress), 37);
+    assert.ok(gameScreenStore.getState().loadProgress > loadProgressAt('worldBuilt', fraction - 0.00005));
+  }
+  gameScreenActions.firstFrame(); await wait;
+  gameScreenActions.resetForMount(); gameScreenActions.loadStage('worldBuilt', 0.9);
+  const stalled = awaitWorldReady(gameScreenStore, 20_000, fake, null, () => now);
+  advance(19_000); emit(0.9003); emit(0.899); emit(NaN);
+  advance(1_001); await assert.rejects(stalled, WorldNotReadyError);
+  finish(); const built = await prepared; await built.dispose?.();
+});
+
+test('an aborted old scene cannot advance the next attempt with late build work', async () => {
+  const { withFirstFrameSignal } = await import('./load-game-scene.ts');
+  const controller = new AbortController();
+  let emit!: (fraction: number) => void;
+  const setup = withFirstFrameSignal((_context, initial) => {
+    emit = initial.onBuildProgress!;
+    return { scene: { traverse() {} }, camera: {} } as never;
+  }, gameScreenActions.loadStage, undefined, null);
+  const built = setup({ signal: controller.signal, invalidate() {}, renderer: { compileAsync: () => Promise.resolve() } } as never, {} as never);
+  controller.abort(); gameScreenActions.resetForMount();
+  emit(0.901); assert.equal(gameScreenStore.getState().loadProgress, 0);
+  await built.dispose?.();
+});

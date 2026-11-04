@@ -1,0 +1,79 @@
+[
+  {
+    "name": "squeaklet",
+    "sourceSHA256": "5dd2079195b6332f82cc09fbfd8c2766cbe15efc7bc8d3d18bb461fa0ced6186",
+    "outputSHA256": "3c8da54c16858961917ac612c23884a50c44f379ce408dcd9bb69c3727cd3fbe",
+    "sourceTriangles": 292926,
+    "triangles": 59999,
+    "meshes": 1,
+    "images": [
+      {
+        "name": "Image_1.002",
+        "source": [
+          2048,
+          2048
+        ],
+        "watch": [
+          512,
+          512
+        ]
+      },
+      {
+        "name": "Image_2.002",
+        "source": [
+          2048,
+          2048
+        ],
+        "watch": [
+          512,
+          512
+        ]
+      },
+      {
+        "name": "Image_0.002",
+        "source": [
+          2048,
+          2048
+        ],
+        "watch": [
+          512,
+          512
+        ]
+      }
+    ],
+    "bytes": 8205041
+  },
+  {
+    "name": "lil-ratti",
+    "sourceSHA256": "6af75d4e5b9a527ebe8a139c6234e283cb1424fe6b8c4c373e00f0179ac0d692",
+    "outputSHA256": "e3b1712b081f94b4f9820026c4213d8643cdc8b55c35dda5294532a0d9bb0bd5",
+    "sourceTriangles": 112590,
+    "triangles": 60000,
+    "meshes": 1,
+    "images": [
+      {
+        "name": "texture_0.001",
+        "source": [
+          2048,
+          2048
+        ],
+        "watch": [
+          512,
+          512
+        ]
+      },
+      {
+        "name": "texture_0_metallic_roughness.001",
+        "source": [
+          4096,
+          4096
+        ],
+        "watch": [
+          512,
+          512
+        ]
+      }
+    ],
+    "bytes": 6823844
+  }
+]

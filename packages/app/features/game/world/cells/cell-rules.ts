@@ -67,18 +67,24 @@ export interface CellPackage {
   readonly vertexCount: number;
   /** World-space bounds of the cell's triangles: min x, y, z, max x, y, z. */
   readonly bounds: Float64Array;
+  /** Shared cohort demand bounds; geometry keeps its own precise `bounds` for culling. */
+  readonly demandBounds?: Float64Array;
   /** Vertex bytes the package uploads (index bytes included when it has an index). */
   readonly bytes: number;
   /**
    * An indexed package's triangles (`index` holds them; the attributes then hold welded vertices). Absent: non-indexed,
    * vertexCount / 3 triangles. A package built elsewhere (world/vd-port) may decode its arrays on first read of
-   * `attributes` and `index`, and drop them again in `release`, which the streamer calls on eviction.
+   * `attributes` and `index`, and drop them again in `release` after upload or on eviction.
    */
   readonly index?: Uint16Array | Uint32Array | null;
   readonly triangles?: number;
   /** Cooperatively prepare exact attributes; false defers attachment until a later frame. */
   prepare?(deadline: number, now: () => number): boolean;
   release?(): void;
+  /** Called after mesh creation while exact CPU geometry is still available. */
+  onAttach?(mesh: InstanceType<Three['Mesh']>): void;
+  /** Idempotently release this package's scene-resource lease on eviction/cancellation, never after CPU upload. */
+  releaseResources?(): void;
   /**
    * A package whose bytes arrive asynchronously (a Metro asset fetched on demand: world/vd-port/furniture): `ready` is
    * false until they are in, and the streamer calls `prefetch` for it inside its layer's reach plus a one-chunk ring and
@@ -90,17 +96,22 @@ export interface CellPackage {
    * lets an on-demand canvas rest. A `prefetch` that returns nothing is polled: the streamer keeps asking for frames.
    */
   ready?(): boolean;
-  prefetch?(): void | Promise<boolean>;
+  prefetch?(wanted?: boolean): void | Promise<boolean>;
   /**
    * True while a finer package of the same ground is in (a far level under its near level, world/vd-port/furniture):
    * the streamer treats it as unwanted, so it leaves as any other cell does and gives its budget back.
    */
   suppressed?(): boolean;
+  /** Additional legacy-only quota inside a raised shared authentic-surface budget. */
+  readonly subBudget?: {readonly geometryBytes:number;readonly cellDraws:number;readonly triangles:number;readonly vertices?:number};
   /**
    * Packages that draw one thing together (a cell level's material slots, world/vd-port/furniture) share a group key:
    * the first of them builds only if all of them fit the budget, so a budget never leaves a level half drawn.
    */
   readonly group?: object;
+  /** Exact complete-cohort totals, including authenticated packages not registered yet.
+   * Admission reserves only wanted cohorts that have begun building; no far-world IO. */
+  readonly groupBudget?: { readonly cells: number; readonly bytes: number; readonly triangles: number; readonly vertices: number };
 }
 
 type Geometry = InstanceType<Three['BufferGeometry']>;

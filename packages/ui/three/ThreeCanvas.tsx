@@ -1,4 +1,5 @@
 'use client';
+import { disposeSceneResources } from './dispose-scene';
 
 import { useEffect, useImperativeHandle, useLayoutEffect, useRef } from 'react';
 import { PixelRatio, Platform, type GestureResponderEvent } from 'react-native';
@@ -18,6 +19,7 @@ import { ThreeSurface } from './surface';
 import type { ThreeBackend, ThreeCanvasProps, ThreeFrameTiming, ThreePointer, ThreeScene, ThreeSurfaceHandle } from './types';
 import type { WebGPURenderer } from 'three/webgpu';
 import { useOnScreen } from './use-on-screen';
+import { createGpuFrameGate, type GpuFrameGate } from './gpu-frame-gate';
 import { tickDue } from './loop-policy';
 
 type PointerLike = GestureResponderEvent & {
@@ -48,6 +50,9 @@ interface Runtime<P> {
   maxFps: number | undefined;
   /** EXPO_PUBLIC_WORLD_PERF: three's timestamp-query channel; null when off or unsupported. */
   gpuTiming: GpuTimestampChannel | null;
+  gpuPacing: GpuFrameGate | null;
+  cameraProbeAt: number;
+  cameraProbeCount: number;
 }
 
 const isWeb = Platform.OS === 'web';
@@ -147,6 +152,9 @@ function JsThreeCanvas<P>({
     probe: { cpuMs: 0, intervalMs: null, backend: 'webgpu' },
     maxFps,
     gpuTiming: null,
+    gpuPacing: null,
+    cameraProbeAt: -Infinity,
+    cameraProbeCount: 0,
   };
 
   // Pick the backend. WebGPU when it works; the WebGL2 backend on web when it
@@ -180,6 +188,7 @@ function JsThreeCanvas<P>({
     rt.queued = false;
     const { renderer, built } = rt;
     if (!renderer || !built || !rt.sized) return;
+    if (rt.gpuPacing && !rt.gpuPacing.begin()) return;
     const now = performance.now();
     const probeStart = onFrameTiming ? now : 0;
     const probeInterval = onFrameTiming && rt.lastProbeStart > 0 ? probeStart - rt.lastProbeStart : null;
@@ -212,6 +221,15 @@ function JsThreeCanvas<P>({
       renderer.render(built.scene, built.camera);
       const t3 = onFrameTiming ? performance.now() : 0;
       rt.surface?.present();
+      if (!isWeb && WORLD_PERF_GPU_TIMESTAMPS && rt.cameraProbeCount < 120 && performance.now() - rt.cameraProbeAt >= 500) {
+        rt.cameraProbeAt = performance.now(); rt.cameraProbeCount++;
+        console.info('[ThreeCanvas] rendered camera', {
+          phase: 'afterRenderer', sequence: rt.cameraProbeCount, cameraUuid: built.camera.uuid,
+          position: built.camera.position.toArray(), quaternion: built.camera.quaternion.toArray(),
+          matrixAutoUpdate: built.camera.matrixAutoUpdate, matrixWorldAutoUpdate: built.camera.matrixWorldAutoUpdate,
+          matrixWorld: [...built.camera.matrixWorld.elements], viewMatrix: [...built.camera.matrixWorldInverse.elements], projectionMatrix: [...built.camera.projectionMatrix.elements],
+        });
+      }
       if (onFrameTiming) {
         try {
           const t4 = performance.now();
@@ -242,7 +260,9 @@ function JsThreeCanvas<P>({
           console.warn('[ThreeCanvas] frame diagnostics failed', error);
         }
       }
+      rt.gpuPacing?.submitted();
     } catch (error) {
+      rt.gpuPacing?.dispose();
       console.error('[ThreeCanvas] render failed.', error);
       status.setState((s) => ({ failed: [...s.failed, (renderer.backend as { isWebGLBackend?: boolean }).isWebGLBackend ? 'webgl2' : 'webgpu'] }));
     }
@@ -250,6 +270,7 @@ function JsThreeCanvas<P>({
 
   const invalidate = () => {
     const rt = runtime.current!;
+    if (rt.gpuPacing?.request()) return;
     if (rt.running || rt.queued) return;
     rt.queued = true;
     // freeRun: on a superseding present path the next frame queues on a
@@ -303,6 +324,7 @@ function JsThreeCanvas<P>({
     const preparation = new AbortController();
     let renderer: WebGPURenderer | null = null;
     let built: ThreeScene<P> | null = null;
+    let gpuPacing: GpuFrameGate | null = null;
     const start = async () => {
       const [THREE, setup] = await Promise.all([loadThree(), load()]);
       // A remounted native canvas can be a frame or two from having a context
@@ -318,21 +340,36 @@ function JsThreeCanvas<P>({
       renderer = surface.createRenderer(THREE, { backend: using, device, rendererParams });
       await renderer.init();
       stopInternalLoop(renderer);
-      if (cancelled) {
-        // Unmounted while init was pending: the cleanup's dispose() was a no-op on an
-        // uninitialised renderer, so this initialised one would otherwise outlive the stage.
-        releaseCanvasBuffers(renderer);
-        void renderer.dispose().catch(() => undefined);
-        renderer = null;
-        return;
-      }
+      if (cancelled) return;
       // EXPO_PUBLIC_WORLD_PERF: arm three's timestamp-query pool — after
       // init, because hasFeature throws earlier, and only where the device
       // was granted 'timestamp-query' (gpu-timestamps.ts). Flag off: not
       // even the hasFeature call runs.
       rt.gpuTiming = WORLD_PERF_GPU_TIMESTAMPS ? armGpuTimestamps(renderer) : null;
       built = await setup({ THREE, renderer, backend: using, invalidate, signal: preparation.signal }, rt.params);
-      if (cancelled) { built.dispose?.(); built = null; return; }
+      if (cancelled) return;
+      if (!isWeb && using === 'webgpu') {
+        // Fence this initialized renderer's actual queue, never an adapter or
+        // another canvas. Keep the latest invalidation while at most two frames run.
+        const queue = (renderer.backend as unknown as { device: { queue: { onSubmittedWorkDone(): Promise<void> } } }).device.queue;
+        gpuPacing = createGpuFrameGate(queue, {
+          maxInFlight: 2,
+          wake: () => {
+            if (cancelled) return;
+            const completed = gpuPacing!.stats.completed;
+            if (WORLD_PERF_GPU_TIMESTAMPS && (completed <= 5 || (completed <= 300 && completed % 30 === 0))) {
+              console.info('[ThreeCanvas] GPU frame pacing', { ...gpuPacing!.stats });
+            }
+            invalidate();
+          },
+          onError: error => {
+            if (cancelled) return;
+            console.error('[ThreeCanvas] GPU frame completion failed.', error);
+            status.setState(s => ({ failed: [...s.failed, using] }));
+          },
+        });
+      }
+      rt.gpuPacing = gpuPacing;
       rt.renderer = renderer;
       rt.built = built;
       rt.surface = surface;
@@ -341,22 +378,35 @@ function JsThreeCanvas<P>({
       onBackendChange?.(using);
       invalidate();
     };
-    start().catch((error: unknown) => {
+    let starting = true;
+    const startup = start().catch((error: unknown) => {
       if (cancelled) return;
       console.error(`[ThreeCanvas] the ${using} backend failed to start.`, error);
       status.setState((s) => ({ failed: [...s.failed, using] }));
-    });
+    }).finally(() => { starting = false; });
     return () => {
       cancelled = true;
       preparation.abort();
-      built?.dispose?.();
-      if (renderer) releaseCanvasBuffers(renderer);
-      void renderer?.dispose().catch((error: unknown) => console.warn('[ThreeCanvas] dispose failed', error));
+      gpuPacing?.dispose();
+      const release = () => disposeSceneResources({
+        disposeScene: () => built?.dispose?.(),
+        releaseRenderer: () => {
+          if (!renderer) return;
+          releaseCanvasBuffers(renderer);
+          return renderer.dispose();
+        },
+        onError: (error: unknown) => console.warn('[ThreeCanvas] dispose failed', error),
+      });
+      // Pending setup owns its native resources, including an active cooperative compile.
+      // Abort publication now, then let setup/scene cleanup drain before renderer teardown.
+      if (starting) void startup.then(release);
+      else void release();
       rt.renderer = null;
       rt.built = null;
       rt.surface = null;
       rt.lastProbeStart = 0;
       rt.gpuTiming = null;
+      rt.gpuPacing = null;
     };
     // invalidate, applySize and status are stable per instance; hasSize gates the first build only.
     // eslint-disable-next-line react-hooks/exhaustive-deps

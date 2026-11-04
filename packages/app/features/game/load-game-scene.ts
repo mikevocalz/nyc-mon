@@ -25,6 +25,8 @@ import { preloadVdBlocks } from './world/vd-port/blocks/load.ts';
 import { preloadVdFar } from './world/vd-port/far-tier/load.ts';
 import { preloadVdStorefrontPlan } from './world/vd-port/storefronts/load.ts';
 import { compileForFrames } from './compile-pass.ts';
+import { withCompileProgressEvent } from './compile-progress-event.ts';
+export { CompileProgressEvent, withCompileProgressEvent } from './compile-progress-event.ts';
 
 export interface GameSceneParams extends CitySceneParams {
   onFirstFrame: () => void;
@@ -39,61 +41,20 @@ export type SceneLoadStage = Extract<LoadStage, 'worldBuilt' | 'compile' | 'firs
  */
 export type LoadStageReporter = (stage: SceneLoadStage, fraction?: number) => void;
 
-/**
- * The ProgressEvent three r186's compileAsync builds its reports with (`new ProgressEvent('progress', {loaded, total})`).
- * Hermes has no such global (React Native imports its own only inside XMLHttpRequest); the render runtime and node
- * have none either, and a host's own class may not carry the init fields. withFirstFrameSignal installs this one for
- * the length of the compile and puts the previous global back after.
- */
-export class CompileProgressEvent {
-  readonly type: string;
-  readonly lengthComputable: boolean;
-  readonly loaded: number;
-  readonly total: number;
-  constructor(type: string, init: { lengthComputable?: boolean; loaded?: number; total?: number } = {}) {
-    this.type = type;
-    this.lengthComputable = init.lengthComputable ?? false;
-    this.loaded = init.loaded ?? 0;
-    this.total = init.total ?? 0;
-  }
-}
-
-interface CompileProgressLease {
-  users: number;
-  previous: PropertyDescriptor | undefined;
-}
-let compileProgressLease: CompileProgressLease | null = null;
-
-/** Concurrent compiles share one installation; each undo releases exactly one lease. */
-export function withCompileProgressEvent(): () => void {
-  const g = globalThis as { ProgressEvent?: unknown };
-  // An external replacement starts a new ownership generation. Old callbacks
-  // must never restore over that replacement or a later generation's shim.
-  if (!compileProgressLease || g.ProgressEvent !== CompileProgressEvent) {
-    compileProgressLease = { users: 0, previous: Object.getOwnPropertyDescriptor(g, 'ProgressEvent') };
-    g.ProgressEvent = CompileProgressEvent;
-  }
-  const lease = compileProgressLease;
-  lease.users++;
-  let released = false;
-  return () => {
-    if (released) return;
-    released = true;
-    lease.users--;
-    if (lease.users !== 0 || compileProgressLease !== lease) return;
-    compileProgressLease = null;
-    if (g.ProgressEvent !== CompileProgressEvent) return;
-    if (lease.previous) Object.defineProperty(g, 'ProgressEvent', lease.previous);
-    else delete g.ProgressEvent;
-  };
-}
-
 /** Reports `fraction` of `stage` only when it moves the bar a whole percent: the worklet path crosses a bridge per call. */
 function throttled(report: LoadStageReporter): (stage: SceneLoadStage, fraction: number) => void {
-  let last = '';
+  let last = '', lastWorldFraction = -1, lastWorldAt = -Infinity;
   return (stage, fraction) => {
+    if (!Number.isFinite(fraction)) return;
     const key = `${stage}:${Math.floor(fraction * 100)}`;
-    if (key === last) return;
+    if (stage === 'worldBuilt') {
+      if (fraction <= lastWorldFraction) return;
+      const now = Date.now();
+      // Real sub-percent work must reach the watchdog; keep its UI/store
+      // notifications bounded while retaining immediate whole-percent steps.
+      if (key === last && now - lastWorldAt < 100) return;
+      lastWorldFraction = fraction; lastWorldAt = now;
+    } else if (key === last) return;
     last = key;
     report(stage, fraction);
   };
@@ -175,27 +136,38 @@ export function withFirstFrameSignal(
     };
     const step = throttled(report);
     // Layered over `initial`, not spread: the worklet path's params are getters (camera, preset) read live.
-    let lastBuildPercent = -1;
+    let lastBuildPercent = -1, lastBuildFraction = -1;
     const withProgress = Object.create(initial, {
       onBuildProgress: { value: (f: number) => {
-        const percent = Math.floor(f * 100);
-        if (percent === lastBuildPercent) return;
-        lastBuildPercent = percent;
+        if (context.signal?.aborted || !Number.isFinite(f) || f <= lastBuildFraction) return;
+        lastBuildFraction = f;
         step('worldBuilt', f);
-        time('worldBuilt', f, `build ${f}`);
+        const percent = Math.floor(f * 100);
+        if (percent !== lastBuildPercent) {
+          lastBuildPercent = percent;
+          time('worldBuilt', f, `build ${f}`);
+        }
       } },
     }) as typeof initial;
     const result = setup(context, withProgress);
-    const finish = (built: ThreeScene<CitySceneParams>): ThreeScene<GameSceneParams> => {
-      if (context.signal?.aborted) { built.dispose?.(); throw Object.assign(new Error('Scene preparation aborted'), { name: 'AbortError' }); }
+    const finish = (built: ThreeScene<CitySceneParams>): ThreeScene<GameSceneParams> | Promise<ThreeScene<GameSceneParams>> => {
+      if (context.signal?.aborted) {
+        const error=Object.assign(new Error('Scene preparation aborted'),{name:'AbortError'});
+        const drain=built.dispose?.();
+        if(drain)return drain.then(()=>{throw error;});
+        throw error;
+      }
       report('worldBuilt');
       time('worldBuilt', 1, 'worldBuilt');
       let disposed = false;
       let firstFrameTimer: ReturnType<typeof setTimeout> | undefined;
       let compiled = false;
+      let compileSettled=false;
+      let disposal:void|Promise<void>;
       let compileSteps = 0;
       const restore = withCompileProgressEvent();
       const ready = () => {
+        compileSettled=true;
         restore();
         if (disposed || context.signal?.aborted) return;
         compiled = true;
@@ -204,6 +176,7 @@ export function withFirstFrameSignal(
         context.invalidate();
       };
       const onProgress = (event: { loaded?: number; total?: number }) => {
+        if (disposed || context.signal?.aborted) return;
         compileSteps++;
         const total = Number(event?.total);
         const fraction = total > 0 ? Number(event?.loaded) / total : compileSteps / (compileSteps + 8);
@@ -237,11 +210,12 @@ export function withFirstFrameSignal(
       return {
         ...built,
         dispose: () => {
-          if (disposed) return;
+          if (disposed) return disposal;
           disposed = true;
           if (firstFrameTimer !== undefined) clearTimeout(firstFrameTimer);
-          restore();
-          built.dispose?.();
+          const release=()=>{restore();return built.dispose?.();};
+          disposal=compileSettled ? release() : compile.catch(()=>{}).then(release);
+          return disposal;
         },
         update: (frame, params) => {
           if (disposed || context.signal?.aborted) return;

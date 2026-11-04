@@ -40,6 +40,32 @@ function withAppGroup(entitlements, group) {
   return { ...entitlements, [ENTITLEMENT]: groups };
 }
 
+/** Declare the generated target before EAS prepares extension credentials. */
+function withEasExtension(config, bundleId) {
+  const extra = config.extra ?? {};
+  const eas = extra.eas ?? {};
+  const build = eas.build ?? {};
+  const experimental = build.experimental ?? {};
+  const ios = experimental.ios ?? {};
+  const extensions = [...(ios.appExtensions ?? [])];
+  const index = extensions.findIndex((entry) => entry.targetName === TARGET_NAME);
+  const existing = index < 0 ? {} : extensions[index];
+  const extension = {
+    ...existing,
+    targetName: TARGET_NAME,
+    bundleIdentifier: widgetBundleId(bundleId),
+    entitlements: withAppGroup(existing.entitlements ?? {}, appGroupId(bundleId)),
+  };
+  if (index < 0) extensions.push(extension);
+  else extensions[index] = extension;
+  return {
+    ...config,
+    extra: { ...extra, eas: { ...eas, build: { ...build, experimental: {
+      ...experimental, ios: { ...ios, appExtensions: extensions },
+    } } } },
+  };
+}
+
 /** The extension's Info.plist. */
 function widgetInfoPlist({ version, buildNumber, group }) {
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -150,7 +176,16 @@ function appDevelopmentTeam(project) {
  * object, so a node test can drive it.
  */
 function addKeychainTarget(project, { bundleId, version, buildNumber, sources }) {
-  if (nativeTargetNamed(project, TARGET_NAME)) return project;
+  const existing = nativeTargetNamed(project, TARGET_NAME);
+  if (existing) {
+    addWidgetPrivacyResource(project, existing[0]);
+    const settings = widgetBuildSettings({ bundleId, version, buildNumber, team: appDevelopmentTeam(project) });
+    const configs = project.pbxXCConfigurationList()[existing[1].buildConfigurationList];
+    for (const ref of configs.buildConfigurations) {
+      Object.assign(project.pbxXCBuildConfigurationSection()[ref.value].buildSettings, settings);
+    }
+    return project;
+  }
 
   // addTargetDependency silently does nothing when these sections are absent,
   // which the Expo template's project does not have until something adds one.
@@ -166,6 +201,7 @@ function addKeychainTarget(project, { bundleId, version, buildNumber, sources })
   const target = project.addTarget(TARGET_NAME, 'app_extension', TARGET_NAME, widgetBundleId(bundleId));
   project.addBuildPhase(sources, 'PBXSourcesBuildPhase', 'Sources', target.uuid);
   project.addBuildPhase([], 'PBXResourcesBuildPhase', 'Resources', target.uuid);
+  addWidgetPrivacyResource(project, target.uuid);
   // WidgetKit and SwiftUI link through Swift's module autolinking (`import`), so the phase stays empty.
   project.addBuildPhase([], 'PBXFrameworksBuildPhase', 'Frameworks', target.uuid);
 
@@ -178,6 +214,15 @@ function addKeychainTarget(project, { bundleId, version, buildNumber, sources })
     if (config.name === 'Debug') config.buildSettings.SWIFT_ACTIVE_COMPILATION_CONDITIONS = 'DEBUG';
   }
   return project;
+}
+
+function addWidgetPrivacyResource(project, targetId) {
+  const groupId = Object.entries(project.hash.project.objects.PBXGroup).find(([key, value]) =>
+    !key.endsWith('_comment') && String(value.path).replace(/"/g, '') === TARGET_NAME)?.[0];
+  if (!groupId) throw new Error('MonKeychain source group is missing');
+  // A source-root path gives each target its own PrivacyInfo reference.
+  project.addResourceFile(`${TARGET_NAME}/PrivacyInfo.xcprivacy`,
+    { target: targetId, sourceTree: 'SOURCE_ROOT' }, groupId);
 }
 
 /** Copies the Swift sources (flattened to basenames) and writes Info.plist and the entitlements. Returns the basenames. */
@@ -193,6 +238,13 @@ function writeTargetFiles(iosRoot, { group, version, buildNumber }) {
   }
   fs.writeFileSync(path.join(dest, 'Info.plist'), widgetInfoPlist({ version, buildNumber, group }));
   fs.writeFileSync(path.join(dest, `${TARGET_NAME}.entitlements`), widgetEntitlements(group));
+  fs.writeFileSync(path.join(dest, 'PrivacyInfo.xcprivacy'), `<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict><key>NSPrivacyTracking</key><false/>
+<key>NSPrivacyCollectedDataTypes</key><array/>
+<key>NSPrivacyAccessedAPITypes</key><array><dict>
+<key>NSPrivacyAccessedAPIType</key><string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+<key>NSPrivacyAccessedAPITypeReasons</key><array><string>1C8F.1</string></array>
+</dict></array></dict></plist>`);
   return names;
 }
 
@@ -203,6 +255,8 @@ const withKeychainWidget = (config) => {
   const group = appGroupId(bundleId);
   const version = config.version ?? '1.0.0';
   const buildNumber = config.ios?.buildNumber ?? '1';
+
+  config = withEasExtension(config, bundleId);
 
   config = withEntitlementsPlist(config, (mod) => {
     mod.modResults = withAppGroup(mod.modResults, group);
@@ -227,6 +281,7 @@ Object.assign(module.exports, {
   appGroupId,
   widgetBundleId,
   withAppGroup,
+  withEasExtension,
   widgetInfoPlist,
   widgetEntitlements,
   widgetBuildSettings,

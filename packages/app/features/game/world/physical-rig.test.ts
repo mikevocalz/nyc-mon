@@ -1,3 +1,4 @@
+import { resolveSourceLook } from './source-look.ts';
 // Slop-grade city, light rig: the flag and probe tables (N3, Phase 0), the
 // presets resolving only through @acme/theme (N2), the hex-literal guard on
 // every file this lane touches (N2), and the rig's three objects built
@@ -101,9 +102,9 @@ test('presets resolve their colours only through @acme/theme (N2)', () => {
     assert.deepEqual(p.colors, { ...physicalCityLight[id] }, id);
     for (const value of Object.values(p.colors)) assert.match(value, /^#[0-9A-F]{6}$/, `${id} ${value}`);
     assert.equal(p.grade, PHYSICAL_GRADE[id]);
-    assert.equal(p.sunIntensity, PHYSICAL_LIGHT[id].sunIntensity);
+    assert.equal(p.sunIntensity, resolveSourceLook(id).sunIntensity);
     assert.ok(Math.abs(Math.hypot(...p.sunDirection) - 1) < 1e-12, `${id} sun direction is unit`);
-    assert.ok(p.sunDirection[1] > 0, `${id} sun above the horizon`);
+    assert.equal(Math.sign(p.sunDirection[1]), id === 'midday' || id === 'golden' ? 1 : -1, `${id} authored solar elevation`);
   }
   assert.equal(PHYSICAL_NIGHT_SKY, physicalCityLight.nightSky);
   assert.equal(parsePhysicalPreset('MIDNIGHT'), 'midnight');
@@ -168,8 +169,8 @@ test('the full rig without a renderer: SkyMesh, SunLight with two cascades, hemi
   scene.fog = priorFog;
   const rig = createPhysicalRig(THREE, null, scene, { features: full, shadowTile: 2048, clusteredMaxLights: 128 });
   assert.ok(rig.sky instanceof SkyMesh);
-  assert.equal(rig.sky.scale.x, PHYSICAL_RIG.skyScale);
-  assert.equal(rig.sky.cloudElevation.value, PHYSICAL_RIG.cloudElevation);
+  assert.equal(rig.sky.scale.x, 20000);
+  assert.ok(scene.getObjectByName('city:source-weather-clouds'), 'separate authored weather deck is mounted');
   assert.ok(rig.sun instanceof SunLight);
   assert.equal(rig.sun.castShadow, true);
   assert.equal(rig.sun.shadow.mapSize.x, 2048);
@@ -182,19 +183,19 @@ test('the full rig without a renderer: SkyMesh, SunLight with two cascades, hemi
   // The default preset reached every consumer.
   const twilight = PHYSICAL_PRESETS.twilight;
   assert.equal(rig.preset, 'twilight');
-  assert.ok(rig.sun.color.equals(new THREE.Color(twilight.colors.sun)));
+  assert.ok(rig.sun.color.equals(new THREE.Color().setRGB(...twilight.sourceLook.sunColor)));
   assert.equal(rig.sun.intensity, twilight.sunIntensity);
-  assert.ok(rig.hemi.groundColor.equals(new THREE.Color(twilight.colors.hemiGround)));
+  assert.ok(rig.hemi.groundColor.equals(new THREE.Color().setRGB(...twilight.sourceLook.hemiGround)));
   assert.equal(rig.uniforms.uInteriorGlow.value, twilight.interiorGlow);
-  assert.equal(rig.sky.turbidity.value, twilight.turbidity);
+  assert.equal(rig.sky.turbidity.value, twilight.sourceLook.sky.turbidity);
 
   rig.applyPreset('golden');
   const golden = PHYSICAL_PRESETS.golden;
   assert.equal(rig.preset, 'golden');
-  assert.ok(rig.sun.color.equals(new THREE.Color(golden.colors.sun)));
+  assert.ok(rig.sun.color.equals(new THREE.Color().setRGB(...golden.sourceLook.sunColor)));
   assert.equal(rig.uniforms.uRoadWetness.value, golden.roadWetness);
   assert.ok(rig.uniforms.uSkySunDir.value.equals(new THREE.Vector3(...golden.sunDirection)));
-  assert.equal((scene.fog as THREE.FogExp2).density, golden.fogDensity);
+  assert.equal((scene.fog as THREE.FogExp2).density, golden.sourceLook.sceneFogDensity);
   assert.equal(rig.sun.position.length().toFixed(6), '1.000000', 'SunLight points from a unit direction');
 
   rig.update(100, 0, 0);
@@ -253,7 +254,7 @@ test('with a renderer: SunLightNode registered once, PMREM baked into one reused
     assert.equal(sunPrototype._lightNode, SunLightNode, 'SunLightNode registered');
     assert.equal(rig.shadowTile, 3072, '8192 limit fits the 6144 atlas');
     assert.equal(calls.length, 1);
-    assert.deepEqual(calls[0], { sigma: 0, near: 0.1, far: 100, reused: null });
+    assert.deepEqual(calls[0], { sigma: .02, near: 0.1, far: 100, reused: null });
     assert.ok(rig.environment);
     assert.equal(scene.environment, rig.environment);
     assert.equal(scene.environmentIntensity, PHYSICAL_PRESETS.twilight.envIntensity);

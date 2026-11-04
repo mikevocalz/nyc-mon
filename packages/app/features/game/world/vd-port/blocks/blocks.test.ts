@@ -167,14 +167,16 @@ test('the port builds: shells resident, the near layer streamed under its own bu
     stream.prime({ x: ax, y: 1.7, z: az + 10 }, k, 200);
     // Cells fetch through the cell source: the bundled bytes land on the next microtask and build on the next update.
     await new Promise((r) => setImmediate(r));
-    for (let t = 0; t < 30; t++) stream.update({ x: ax, y: 1.7, z: az + 10 }, k, t / 10);
+    for (let t = 0; t < 240; t++) stream.update({ x: ax, y: 1.7, z: az + 10 }, k, t / 10);
     const near = port.group.children.filter((o) => o.name === NEAR_NAME && o.userData.cell !== undefined);
     assert.ok(near.length > 0, 'near cells built at the Apollo');
     assert.ok(stream.stats.triangles <= WORLD_PRESETS['ipad-a12x'].vdPort.blocksNear.triangles, `${stream.stats.triangles} near triangles`);
     // the mask starts on the third update (the first two draw every shell through the START compile)
     for (let i = 0; i < 3; i++) port.update(0);
     const hidden = shells.filter((m) => !m.visible).length;
-    assert.equal(hidden, near.length, 'each resident near cell hides the shell cell under it');
+    const fadedNear = near.filter(m => m.userData.cellFade >= 1);
+    assert.ok(fadedNear.length > 0, 'cooperative near cells finish fading');
+    assert.equal(hidden, fadedNear.length, 'only fully faded resident near cells hide their shells');
     // walk away: everything evicts, the decoded arrays go with it, the shells come back
     for (let t = 1; t < 30; t++) stream.update({ x: ax + 2000, y: 1.7, z: az + 2000 }, k, t);
     port.update(30);
@@ -330,9 +332,12 @@ test('port preparation yields completed shell cells and cancellation disposes it
   const options = { physical: false, night: 0, groundY: () => 0.14, sunDirection: [0, 1, 0] as const, sunColor: [1, 1, 1] as const, horizon: [0.8, 0.8, 0.9] as const };
   try {
     const preparation = prepareVdPort(capture, dataset, options);
-    const first = preparation.next();
+    let first = preparation.next();
     assert.equal(first.done, false);
     const group = groups[0]!;
+    while (!group.children.some(child => child.name === SHELL_NAME)) {
+      first = preparation.next(); assert.equal(first.done, false);
+    }
     assert.equal(group.children.filter(child => child.name === SHELL_NAME).length, 1);
     let disposed = 0;
     (group.children[0] as THREE.Mesh).geometry.addEventListener('dispose', () => disposed++);

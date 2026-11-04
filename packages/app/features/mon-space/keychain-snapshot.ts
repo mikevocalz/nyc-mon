@@ -35,6 +35,7 @@ export interface MonCareViewLike {
 }
 
 export interface KeychainInput {
+  readonly watch?: KeychainSnapshot['watch'];
   readonly monName: string;
   readonly view: MonCareViewLike;
   readonly predictions: readonly PredictedCall[];
@@ -42,6 +43,12 @@ export interface KeychainInput {
 }
 
 export interface KeychainSnapshot {
+  /** Optional native Watch presentation; old widget builds ignore it. */
+  readonly watch?: {
+    readonly speciesId: string;
+    readonly hello: string;
+    readonly hungry: string;
+  };
   readonly v: typeof KEYCHAIN_SNAPSHOT_VERSION;
   readonly monName: string;
   readonly hearts: { readonly fullness: Hearts; readonly energy: Hearts; readonly social: Hearts };
@@ -105,6 +112,7 @@ export function buildKeychainSnapshot(input: KeychainInput): KeychainSnapshot {
   const a11y = (state: string) => careCopy('keychain.a11y', { name, state, ...hearts });
 
   return {
+    ...(input.watch ? { watch: input.watch } : {}),
     v: KEYCHAIN_SNAPSHOT_VERSION,
     monName: name,
     hearts,

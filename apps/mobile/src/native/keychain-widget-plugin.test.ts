@@ -45,6 +45,27 @@ function configsOf(project: any, target: any): any[] {
 }
 
 describe('ids', () => {
+  it('declares EAS extension credentials without losing existing target configuration', () => {
+    const other = { targetName: 'Other', bundleIdentifier: 'com.nycmon.app.other' };
+    const config = { extra: { flag: true, eas: { projectId: 'existing-project', build: {
+      experimental: { ios: { appExtensions: [other, {
+        targetName: 'MonKeychain', entitlements: { 'existing-entitlement': true,
+          'com.apple.security.application-groups': ['group.other'] },
+      }] } },
+    } } } };
+    const once = plugin.withEasExtension(config, BUNDLE);
+    assert.deepEqual(plugin.withEasExtension(once, BUNDLE), once);
+    assert.equal(once.extra.flag, true);
+    assert.equal(once.extra.eas.projectId, 'existing-project');
+    const entries = once.extra.eas.build.experimental.ios.appExtensions;
+    assert.deepEqual(entries[0], other);
+    assert.equal(entries[1].bundleIdentifier, 'com.nycmon.app.keychain');
+    assert.equal(entries[1].entitlements['existing-entitlement'], true);
+    assert.deepEqual(entries[1].entitlements['com.apple.security.application-groups'],
+      ['group.other', 'group.com.nycmon.app']);
+    assert.equal(config.extra.eas.build.experimental.ios.appExtensions[1].bundleIdentifier, undefined);
+  });
+
   it('derives the App Group and widget bundle id from the app bundle id', () => {
     assert.equal(plugin.appGroupId(BUNDLE), 'group.com.nycmon.app');
     assert.equal(plugin.widgetBundleId(BUNDLE), 'com.nycmon.app.keychain');

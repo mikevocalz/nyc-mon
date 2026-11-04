@@ -2,6 +2,7 @@
 // stores: placing the Caller at hand-over, the cap actions, and the stick's
 // step actions for screen-reader users (WCAG 2.5.7, the non-drag path).
 // use-game-input.ts owns the frame loop and calls into here.
+import { residentCollisionRevision } from '../resident-collision.ts';
 import { AccessibilityInfo } from 'react-native';
 import { describeCamera, ORBIT_STEP } from '../camera-input.ts';
 import { chaseCamera, nextChaseDistance } from '../city-camera.ts';
@@ -15,7 +16,7 @@ import { cameraRelativeDirection, cycleMetresFor, headingFor, slideMove, WALK_SP
 import type { WorldQueries } from './walkability.ts';
 import { cityGroundHeight, isWalkable } from './world-queries.ts';
 
-export const worldQueries: WorldQueries = { isWalkable, groundHeight: cityGroundHeight };
+export const worldQueries: WorldQueries = { isWalkable, groundHeight: cityGroundHeight, collisionRevision: residentCollisionRevision };
 
 /** Camera work in flight (the recentre swing, the block settle). Module scope with the stores; read and written by the frame loop. */
 export const chaseRef: { current: ChaseState } = { current: IDLE_CHASE };
