@@ -34,7 +34,7 @@ export function NativeDropdown({
           <Text className="text-xs text-text-muted">⌄</Text>
         </View>}
       >
-        <View role="listbox" className="gap-2">
+        <View role={"listbox" as never} className="gap-2">
           {model.groups.map(group => (
             <View key={group.id} className="gap-1 border-b border-border pb-2 last:border-b-0">
               {group.label ? <Text role="heading" className="px-2 py-1 text-xs font-semibold text-text-muted">{group.label}</Text> : null}
