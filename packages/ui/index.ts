@@ -79,6 +79,7 @@ export { riveLoaderColors, type RiveLoaderPhase, type RiveLoaderScheme, type Riv
 export { List, ListItem, type ListProps, type ListItemProps } from './List';
 export { NativeSlot, type NativeSlotProps } from './NativeSlot';
 export { Menu, type MenuProps, type MenuAction } from './Menu';
+export { Popover, type PopoverProps } from './Popover';
 export { useSizeClass, type SizeClass } from './use-size-class';
 export {
   Motion, AnimatePresence, createMotionComponent, createMotionAnimatedComponent,
