@@ -4,6 +4,7 @@ import { Host, Box, OutlinedButton, DropdownMenuPopup, DropdownMenuGroup,
   SelectableDropdownMenuItem, Spacer, Text as ComposeText } from '@expo/ui/jetpack-compose';
 import { height, paddingAll } from '@expo/ui/jetpack-compose/modifiers';
 import { haptics } from './haptics';
+import { View } from './tw';
 import { useInstanceStore, useStore } from './use-instance-store';
 import { prepareNativeDropdown, selectNativeDropdown } from './NativeDropdown.model';
 import type { NativeDropdownProps } from './NativeDropdown.types';
@@ -28,12 +29,12 @@ export function NativeDropdown({
   const show = () => { if (!disabled) store.setState({ open: true }); };
 
   return (
-    <Host matchContents>
+    <View testID={testID}>
+      <Host matchContents>
       <Box>
         <OutlinedButton
           enabled={!disabled}
           onClick={show}
-          testID={testID}
         >
           <ComposeText>{label}: {model.selected?.label ?? 'Choose'}</ComposeText>
         </OutlinedButton>
@@ -68,6 +69,7 @@ export function NativeDropdown({
           ))}
         </DropdownMenuPopup>
       </Box>
-    </Host>
+      </Host>
+    </View>
   );
 }
