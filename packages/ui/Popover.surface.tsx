@@ -1,6 +1,7 @@
 'use client';
 import type { ReactNode } from 'react';
 import { Pressable, ScrollView, Text, View } from './tw';
+import { haptics } from './haptics';
 
 /** Neutral source-owned instrument face; document pixels are never tinted. */
 export function PopoverSurface({
@@ -44,8 +45,8 @@ export function PopoverTrigger({
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ expanded }}
-      onPress={onPress}
-      className="min-h-12 min-w-12 items-center justify-center rounded-sm focus-visible:outline-2 focus-visible:outline-primary"
+      onPress={() => { if (!expanded) haptics.selection(); onPress(); }}
+      className="min-h-12 min-w-12 items-center justify-center rounded-sm transition-colors duration-fast hover:bg-surface-sunken active:bg-surface-sunken focus-visible:outline-2 focus-visible:outline-primary motion-reduce:transition-none"
     >
       {children}
     </Pressable>
