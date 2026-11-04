@@ -1,0 +1,40 @@
+name: Native Dropdown SDK58 Typecheck and Lint
+
+on:
+  push:
+    branches:
+      - feat/ui-material3-expressive-dropdowns-2026-11-04
+    paths:
+      - 'packages/ui/NativeDropdown*'
+      - 'packages/ui/index.ts'
+      - 'packages/ui/html/dom.web.tsx'
+      - 'pnpm-workspace.yaml'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/native-dropdown-typecheck.yml'
+  pull_request:
+    paths:
+      - 'packages/ui/NativeDropdown*'
+      - 'packages/ui/index.ts'
+      - 'packages/ui/html/dom.web.tsx'
+      - 'pnpm-workspace.yaml'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/native-dropdown-typecheck.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  sdk58-native-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm --filter @acme/ui typecheck
+      - run: pnpm --filter @acme/ui exec eslint NativeDropdown.android.tsx NativeDropdown.ios.tsx NativeDropdown.web.tsx NativeDropdown.types.ts NativeDropdown.model.ts NativeDropdown.model.test.ts NativeDropdown.stories.tsx
+      - run: node --experimental-strip-types --test packages/ui/NativeDropdown.model.test.ts
