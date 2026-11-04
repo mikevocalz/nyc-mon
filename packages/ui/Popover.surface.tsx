@@ -44,7 +44,7 @@ export function PopoverTrigger({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityState={{ expanded }}
+      aria-expanded={expanded}
       onPress={() => { if (!expanded) haptics.selection(); onPress(); }}
       className="min-h-12 min-w-12 items-center justify-center rounded-sm transition-colors duration-fast hover:bg-surface-sunken active:bg-surface-sunken focus-visible:outline-2 focus-visible:outline-primary motion-reduce:transition-none"
     >
