@@ -1,4 +1,5 @@
 'use client';
+import { Fragment } from 'react';
 import { Host, Box, OutlinedButton, DropdownMenuPopup, DropdownMenuGroup,
   SelectableDropdownMenuItem, Spacer, Text as ComposeText } from '@expo/ui/jetpack-compose';
 import { height, paddingAll } from '@expo/ui/jetpack-compose/modifiers';
@@ -38,7 +39,7 @@ export function NativeDropdown({
         </OutlinedButton>
         <DropdownMenuPopup expanded={open && !disabled} onDismissRequest={close}>
           {model.groups.map((group, groupIndex) => (
-            <Box key={group.id}>
+            <Fragment key={group.id}>
               {groupIndex > 0 ? <Spacer modifiers={[height(2)]} /> : null}
               <DropdownMenuGroup
                 shapes={{ index: groupIndex, count: model.groups.length }}
@@ -63,7 +64,7 @@ export function NativeDropdown({
                   </SelectableDropdownMenuItem>
                 ))}
               </DropdownMenuGroup>
-            </Box>
+            </Fragment>
           ))}
         </DropdownMenuPopup>
       </Box>
