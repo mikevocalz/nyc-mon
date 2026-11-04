@@ -19,7 +19,7 @@ export function Popover({
   const regions = useReservedRegions();
   const sheet = popoverVessel({ width, height, regions }) === 'sheet';
   const callback = useRef(onOpenChange);
-  callback.current = onOpenChange;
+  useEffect(() => { callback.current = onOpenChange; }, [onOpenChange]);
   const root = useRef<HTMLDivElement>(null);
   const panel = useRef<HTMLDivElement>(null);
   const focusAfterClose = useRef(false);
