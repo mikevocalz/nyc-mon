@@ -44,7 +44,7 @@ function BrushInspector({ folded = false }: { folded?: boolean }) {
           }))} />
         </View>
         <Text className="text-xs text-text-muted">
-          This is a presentation fixture; Forge's Rust engine owns real edits.
+          This is a presentation fixture; Forge&apos;s Rust engine owns real edits.
         </Text>
       </View>
     </Popover>
