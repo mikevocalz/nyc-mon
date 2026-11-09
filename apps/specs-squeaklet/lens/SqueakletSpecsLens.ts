@@ -9,7 +9,7 @@ import { ViroSpecsSceneControllerHost } from "../ViroSpecs/lens/ViroSpecsSceneCo
 import { buildSqueakletLensScene, type Care, type View } from "./SqueakletLensScene";
 const asr = require("LensStudio:AsrModule") as AsrModule;
 type Gateway = {
- care?:Care; mood?:string; mon?:{name?:string|null};
+ care?:Care; mood?:string; mon?:{name?:string|null;speciesId?:string};
  eggs?:{eggId:string;speciesId:string;readyToHatch:boolean;minutesRemaining:number}[];
  hatching?:boolean;alreadyHatched?:boolean;applied?:boolean;
  say?:{caption:string};reply?:{caption:string;text?:string};caption?:string;
@@ -30,6 +30,7 @@ export class SqueakletSpecsLens extends BaseScriptComponent {
  private eggId:string="";
  private history:{caller:string;reply:string}[]=[];
  private hatchStart=0;
+ private nextEggPoll=0;
  private lastFrame=-1;
  private busy=false;
  private listening=false;
@@ -74,16 +75,34 @@ export class SqueakletSpecsLens extends BaseScriptComponent {
  private async load():Promise<void>{
   this.screen="loading";this.error="";this.caption="Checking on Squeaklet";this.render();
   try{const r=await this.request("get_mon_status");this.applyCare(r);
+   if(r.mon?.speciesId && r.mon.speciesId!=="dex-002")throw Error("Active Mon is not dex-002");
    this.screen="pet";this.caption="Squeaklet is here!";this.render();return;
   }catch{}
   try{
    const r=await this.request("check_incubation");
-   const egg=r.eggs?.find(x=>x.speciesId==="dex-001")||r.eggs?.[0];
+   const egg=r.eggs?.find(x=>x.speciesId==="dex-001");
    if(!egg)throw Error("No egg");
    this.eggId=egg.eggId;this.screen=egg.readyToHatch?"ready":"incubating";
+   this.nextEggPoll=Date.now()+30000;
    this.caption=egg.readyToHatch?"Pinch HATCH!":"Egg ready in "+egg.minutesRemaining+" minutes";
    this.render();
   }catch{this.screen="error";this.error="Connect a verified Caller account";this.render();}
+ }
+ private async pollIncubation():Promise<void>{
+  if(this.busy || this.screen!=="incubating")return;
+  this.busy=true;
+  try{
+   const response=await this.request("check_incubation");
+   const egg=response.eggs?.find(x=>x.eggId===this.eggId && x.speciesId==="dex-001");
+   if(!egg){this.error="Egg status unavailable. Check pairing.";return;}
+   this.error="";
+   this.screen=egg.readyToHatch?"ready":"incubating";
+   this.caption=egg.readyToHatch?"Your egg is ready. Pinch HATCH!":"Hatch in "+egg.minutesRemaining+" minutes";
+   this.render();
+  }catch{
+   this.caption="Egg status unavailable offline. Will retry.";
+   this.render();
+  }finally{this.busy=false;}
  }
  private async hatch():Promise<void>{
   if(this.screen!=="ready"||!this.eggId||this.busy)return;
@@ -99,6 +118,11 @@ export class SqueakletSpecsLens extends BaseScriptComponent {
   finally{this.busy=false;this.render();}
  }
  private tick():void{
+  if(this.screen==="incubating" && !this.busy && Date.now()>=this.nextEggPoll){
+   this.nextEggPoll=Date.now()+30000;
+   void this.pollIncubation();
+   return;
+  }
   if(this.screen!=="hatching")return;
   const elapsed=Date.now()-this.hatchStart;
   if(elapsed>=15000){this.screen="pet";this.caption="Meet Squeaklet!";this.render();return;}
