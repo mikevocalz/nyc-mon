@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {SQUEAKLET,HATCH_BEATS,HATCH_DURATION_MS,hatchFrame,meter,voiceIntent,makeScene,careFromServer,SpecsSqueakletSession}
  from "../src/specs.mjs";
-import {mcpCall,createSpecsGateway} from "../src/bridge.mjs";
+import {mcpCall,createSpecsGateway,specsBabbleActive,SPECS_BABBLE_MS} from "../src/bridge.mjs";
 const care={energy:0.81,fullness:0.23,social:0.6,activity:"awake",wantsFood:false};
 const status={mon:{monId:"mon123",name:"Squeaklet"},mood:"needs-fullness",care};
 test("reveal is precisely fifteen seconds and six source beats",()=>{
@@ -90,4 +90,35 @@ test("canonical voice restricts speech and full chat requires server key",async(
  const canon=await gateway({action:"turn",text:"Hi",voiceMode:"canon"},"token");
  assert.equal(canon.reply.caption,"Chirp!");
  await assert.rejects(()=>gateway({action:"turn",text:"Hi",voiceMode:"hackathon-chat"},"token"));
+});
+
+test("SPECS Baby babble stops at exactly thirty seconds",()=>{
+ assert.equal(SPECS_BABBLE_MS,30000);
+ assert.equal(specsBabbleActive({hatchedAt:1000},30999),true);
+ assert.equal(specsBabbleActive({hatchedAt:1000},31000),false);
+ assert.equal(specsBabbleActive({hatchedAt:1000},60000),false);
+ assert.equal(specsBabbleActive({hatchedAt:1000},500),false);
+});
+test("SPECS demo uses canonical babble before 30s then full chat",async()=>{
+ const calls=[];
+ const fake=async(url,options)=>{
+  if(url.includes("api.openai.com")){
+   calls.push("ai");
+   return {ok:true,json:async()=>({choices:[{message:{content:"Hey Callah! What's good?"}}]})};
+  }
+  calls.push("mcp");
+  return {ok:true,text:async()=>JSON.stringify({jsonrpc:"2.0",result:{
+   structuredContent:{...status,mon:{...status.mon,hatchedAt:1000},say:{text:"Squee!",caption:"Squee!"}}
+  }})};
+ };
+ let now=30999;
+ const gateway=createSpecsGateway({mcpUrl:"https://example.test/mcp",openAiKey:"server-secret",fetcher:fake,now:()=>now});
+ const babble=await gateway({action:"turn",text:"Hello",voiceMode:"hackathon-chat"},"token");
+ assert.equal(babble.reply.caption,"Squee!");
+ assert.equal(babble.demoBabbling,true);
+ assert.deepEqual(calls,["mcp"]);
+ now=31000;
+ const spoken=await gateway({action:"turn",text:"Hello",voiceMode:"hackathon-chat"},"token");
+ assert.equal(spoken.reply.caption,"Hey Callah! What's good?");
+ assert.deepEqual(calls,["mcp","mcp","ai"]);
 });
