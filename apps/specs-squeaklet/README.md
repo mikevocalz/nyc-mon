@@ -7,7 +7,7 @@ A 2026 Specs hackathon experimental Lens experience using the real NYC-MON Squea
 - 15-second six-beat hatch reveal: stir 2.2s, pressure 1.7s, crack 3.5s, burst 0.8s, emerge 3.3s, attention/first look 3.5s. Server confirms the one Mon before animation. Skip after two seconds; reduced-motion keeps the full time.
 - Original Squeaklet dex-002 rig source is https://admin.nyc-mon.city/v1/mon-models/glb/dex-002. Its rig clips are jaw_chomp, mouth_close, rat_run, tail_swish, blink. Metro Egg must be imported too.
 - ViroSpecsSceneControllerHost protocol-2 scene: 3D Squeaklet or egg, hand-pinched Hatch, Feed, Play, Rest/Wake, Talk, and Skip controls. Three Rive-export image IDs show Energy, Fullness and Social; precise percentages render as native Lens Text.
-- Specs ASR final transcripts to HTTPS gateway. Gateway forwards verified Caller token to the existing NYC-MON MCP for all care writes and speech/status. A server-only chat model can answer context-aware conversations. Voice mode hackathon-chat permits Baby speech as a deliberate experimental exception; voiceMode canon retains Baby babble.
+- Specs ASR final transcripts to HTTPS gateway. Gateway forwards verified Caller token to the existing NYC-MON MCP for all care writes and speech/status. A server-only chat model can answer context-aware conversations. Voice mode hackathon-chat permits Baby babble only during the first 30 seconds after the authoritative hatch timestamp; from second 30 onward, Squeaklet speaks conversationally. This demo-only exception leaves voiceMode canon and the main game's 24-hour Baby babble unchanged.
 - Offline/error states never fabricate changes in meters or hatch confirmation. No WebView.
 
 ## Files
