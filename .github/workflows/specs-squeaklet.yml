@@ -16,6 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
@@ -24,7 +26,7 @@ jobs:
         run: node --test tests/*.test.mjs
       - name: Verify no production files changed compared with origin/main
         run: |
-          git fetch origin main --depth=1
+          git fetch origin main
           FILES="$(git diff --name-only origin/main...HEAD)"
           echo "$FILES"
           if echo "$FILES" | grep -Ev '^(apps/specs-squeaklet/|\.github/workflows/specs-squeaklet\.yml$)' | grep -q .; then
