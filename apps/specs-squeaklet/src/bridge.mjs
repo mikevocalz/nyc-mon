@@ -17,7 +17,14 @@ export async function mcpCall({url,token,name,args={},fetcher=fetch}){
  if(!payload||typeof payload!=="object")throw Error("Invalid MCP result");
  return payload;
 }
-export function createSpecsGateway({mcpUrl,openAiKey,aiModel="gpt-4.1-mini",fetcher=fetch}){
+export const SPECS_BABBLE_MS = 30_000;
+/** Demo-only: no baby babble after 30 seconds from authoritative hatch timestamp. */
+export function specsBabbleActive(mon, nowMs){
+ const hatchedAt=mon?.hatchedAt;
+ return typeof hatchedAt==="number" && Number.isFinite(hatchedAt) &&
+  nowMs>=hatchedAt && nowMs-hatchedAt<SPECS_BABBLE_MS;
+}
+export function createSpecsGateway({mcpUrl,openAiKey,aiModel="gpt-4.1-mini",fetcher=fetch,now=()=>Date.now()}){
  const call=(token,name,args)=>mcpCall({url:mcpUrl,token,name,args,fetcher});
  return async function handle(body,token){
   if(!token)throw Error("Pair the Caller first");
@@ -40,9 +47,13 @@ export function createSpecsGateway({mcpUrl,openAiKey,aiModel="gpt-4.1-mini",fetc
   if(intent==="get_mon_status")return call(token,intent,{});
   const status=await call(token,"talk_to_mon",{});
   if(body.voiceMode==="canon")return {...status,reply:{caption:status.say?.caption||"Chirp!"}};
+  if(specsBabbleActive(status.mon,now())){
+   // Use server-authored babble, not model-generated language, for first 30s.
+   return {...status,reply:{caption:status.say?.caption||"Chirp!",text:status.say?.text||"Chirp!"},demoBabbling:true};
+  }
   if(!openAiKey)throw Error("Server-only language model is not configured");
   const system="You are Squeaklet (NYC-MON dex-002), a friendly, confident, playful "+
-   "Hood Ratti-line Mon. This isolated SPECS hackathon permits full-chat Baby speech, "+
+   "Hood Ratti-line Mon. On SPECS, full conversation starts no later than 30 seconds after hatch, "+
    "unlike the main game's canonical 24-hour babble gate. Keep each reply under "+
    "two short sentences. You can say Callah occasionally. No caricature, stereotypes, "+
    "guilt, streaks, injury, death, or claims that care changed without a tool result. "+
