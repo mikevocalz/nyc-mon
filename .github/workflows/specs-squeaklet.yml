@@ -1,0 +1,33 @@
+name: Specs Squeaklet hackathon checks
+on:
+  push:
+    branches: [specs]
+    paths:
+      - "apps/specs-squeaklet/**"
+      - ".github/workflows/specs-squeaklet.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    if: github.ref == 'refs/heads/specs'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Test hatch, Viro scene, care, speech bridge contracts
+        working-directory: apps/specs-squeaklet
+        run: node --test tests/*.test.mjs
+      - name: Verify no production files changed compared with origin/main
+        run: |
+          git fetch origin main --depth=1
+          FILES="$(git diff --name-only origin/main...HEAD)"
+          echo "$FILES"
+          if echo "$FILES" | grep -Ev '^(apps/specs-squeaklet/|\.github/workflows/specs-squeaklet\.yml$)' | grep -q .; then
+            echo "::error::SPECS hackathon branch modifies production files"
+            exit 1
+          fi
